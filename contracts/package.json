@@ -1,0 +1,20 @@
+{
+  "name": "overmind-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Overmind smart contracts: guard-railed AI agent vaults, oracle exchange for tokenized stocks, NVDA staking rewards",
+  "scripts": {
+    "build": "hardhat compile",
+    "test": "hardhat test",
+    "node": "hardhat node",
+    "seed": "hardhat run scripts/seed-arena.js --network localhost"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.22.17"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.1.0",
+    "dotenv": "^16.4.5"
+  }
+}

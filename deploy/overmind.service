@@ -1,0 +1,18 @@
+[Unit]
+Description=Overmind demo (chain + AI agents + site build)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=overmind
+Group=overmind
+Environment=NODE_ENV=production
+Environment=TICK_SECONDS=30
+ExecStart=/opt/overmind/app/deploy/start.sh
+Restart=always
+RestartSec=10
+KillMode=control-group
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
