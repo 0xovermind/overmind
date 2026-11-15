@@ -7,7 +7,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 
 /// @title GlassStaking — stake $GLASS, earn NVDA.
 /// @notice Anyone can push reward tokens in with `notifyReward`; they are split instantly across
-///         current stakers pro rata. The Glassmind treasury routes the AI agents' performance fees
+///         current stakers pro rata. The Overmind treasury routes the AI agents' performance fees
 ///         here after converting them to the reward token. No owner, no admin withdraw, no lockup.
 contract GlassStaking is ReentrancyGuard {
     using SafeERC20 for IERC20;

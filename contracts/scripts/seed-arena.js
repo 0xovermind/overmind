@@ -1,4 +1,4 @@
-// LOCAL DEMO ONLY: deploys the Glassmind arena on the Hardhat node and simulates
+// LOCAL DEMO ONLY: deploys the Overmind arena on the Hardhat node and simulates
 // 4 days of 24/7 stock-token prices with 4 AI agent vaults trading and depositors joining.
 //   npx hardhat run scripts/seed-arena.js --network localhost
 const fs = require("fs");
@@ -52,7 +52,7 @@ async function main() {
   const vaults = [];
   for (let i = 0; i < PERSONAS.length; i++) {
     const p = PERSONAS[i];
-    await (await arena.createVault(`Glassmind ${p.name}`, p.symbol, p.tagline, agents[i].address, tokens.map((t) => t.target),
+    await (await arena.createVault(`Overmind ${p.name}`, p.symbol, p.tagline, agents[i].address, tokens.map((t) => t.target),
       p.maxPositionBps, p.maxDrawdownBps, p.perfFeeBps)).wait();
   }
   const addrs = await arena.getVaults();

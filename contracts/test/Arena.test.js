@@ -21,7 +21,7 @@ async function arenaFixture() {
   await usd.mint(exchange.target, U(10000));
 
   const arena = await ethers.deployContract("Arena", [owner.address, usd.target, exchange.target, treasury.address]);
-  await arena.createVault("Glassmind Value", "gVALUE", "Patient value investor", agent.address, [tsla.target, nvda.target], 4000, 2500, 1000);
+  await arena.createVault("Overmind Value", "gVALUE", "Patient value investor", agent.address, [tsla.target, nvda.target], 4000, 2500, 1000);
   const [vaultAddr] = await arena.getVaults();
   const vault = await ethers.getContractAt("AgentVault", vaultAddr);
 
@@ -38,7 +38,7 @@ async function funded() {
   return f;
 }
 
-describe("Glassmind arena", function () {
+describe("Overmind arena", function () {
   describe("deposits and withdrawals", function () {
     it("first deposit mints shares at $1.00", async function () {
       const { vault, alice } = await loadFixture(funded);

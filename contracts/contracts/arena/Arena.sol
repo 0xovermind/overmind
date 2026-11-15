@@ -6,7 +6,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {AgentVault} from "./AgentVault.sol";
 import {OracleExchange} from "./OracleExchange.sol";
 
-/// @title Arena — Glassmind registry of competing AI agent vaults.
+/// @title Arena — Overmind registry of competing AI agent vaults.
 contract Arena is Ownable {
     IERC20 public immutable usd;
     OracleExchange public immutable exchange;

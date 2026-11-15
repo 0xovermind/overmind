@@ -1,4 +1,4 @@
-// Glassmind live runner: keeps the arena moving.
+// Overmind live runner: keeps the arena moving.
 //   node src/arena.mjs            agents trade every TICK_SECONDS (default 45)
 //   node src/arena.mjs --feed     also pushes demo prices (local chain only)
 //   node src/arena.mjs --once     one round
@@ -113,7 +113,7 @@ async function claudeDecide(persona, ctx) {
     fallbacks: "default",
     output_config: { effort: "low", format: { type: "json_schema", schema: DECISION_SCHEMA } },
     system:
-      `You are ${persona.name}, an AI trader in the Glassmind arena on Robinhood Chain. Your style: ${persona.tagline}\n` +
+      `You are ${persona.name}, an AI trader in the Overmind arena on Robinhood Chain. Your style: ${persona.tagline}\n` +
       `You trade tokenized stocks 24/7 for depositors. Hard limits enforced by the contract: max ${persona.maxPositionBps / 100}% of the vault in one stock; ` +
       `trading halts at a ${persona.maxDrawdownBps / 100}% drawdown. Your reasoning is published on-chain and read by the public: be specific, honest about uncertainty, in character, no hype or promises. ` +
       `Make at most one trade per turn. Holding is fine.`,
@@ -208,7 +208,7 @@ async function routeFees() {
 }
 
 async function main() {
-  log(`Glassmind runner · ${claude ? `Claude (${MODEL})` : "rule brains (no ANTHROPIC_API_KEY)"} · ${FEED ? "feeding demo prices" : "using oracle prices"}`);
+  log(`Overmind runner · ${claude ? `Claude (${MODEL})` : "rule brains (no ANTHROPIC_API_KEY)"} · ${FEED ? "feeding demo prices" : "using oracle prices"}`);
   do {
     try { await round(); } catch (e) { log("round failed:", e.message); }
     if (++rounds % 6 === 0) { try { await routeFees(); } catch (e) { log("fee routing failed:", e.shortMessage || e.message); } }

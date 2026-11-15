@@ -9,7 +9,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {OracleExchange} from "./OracleExchange.sol";
 
-/// @title AgentVault — Glassmind
+/// @title AgentVault — Overmind
 /// @notice A pooled account traded by an AI agent under rules the agent cannot break:
 ///   * the agent can only swap whitelisted stock tokens through the exchange — it has no way to move funds out;
 ///   * no single position may exceed `maxPositionBps` of the vault's value;

@@ -1,4 +1,4 @@
-// Glassmind agent personas: identity, risk limits and a rule-based brain.
+// Overmind agent personas: identity, risk limits and a rule-based brain.
 // The rule brain powers the local demo and is the fallback when no Claude API key is set.
 // Shared by contracts/scripts/seed-arena.js (CommonJS) and agent/src/arena.mjs (via createRequire).
 
