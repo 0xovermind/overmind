@@ -23,6 +23,7 @@ import { updateSettings, useSettings } from '@/lib/settings';
 import { AboutCard, PositionCard, ThesisBox } from './simple-rail';
 import { SafetyGrid } from './safety-grid';
 import { HiveCard } from './hive-card';
+import { TokenMapTab } from './token-map';
 import { useTokenCallouts, type Callout } from '@/lib/callouts';
 import { CallsFeed } from './calls-feed';
 import { useEthUsd } from '@/lib/profile';
@@ -167,6 +168,7 @@ export function TokenView({
             />
           )}
           {tab === 'bubbles' && <BubblesTab address={t.address} />}
+          {tab === 'map' && <TokenMapTab address={t.address} />}
           {tab === 'dev' && <DevTokensTab deployer={t.deployer} self={t.address} serverNow={serverNow} />}
         </>
       }
@@ -848,7 +850,7 @@ function DevStat({ k, v, bad, good }: { k: string; v: string; bad?: boolean; goo
 
 /* ------------------------------------------------------------------ bottom tabs */
 
-type Tab = 'trades' | 'calls' | 'holders' | 'traders' | 'early' | 'bubbles' | 'dev';
+type Tab = 'trades' | 'calls' | 'holders' | 'traders' | 'early' | 'bubbles' | 'map' | 'dev';
 
 /** The calls feed with its own clock (time-ago labels), so the page doesn't re-render every second. */
 function CallsPanel(props: { symbol: string; items: Callout[] | null; selected: string | null; onSelect: (id: string | null) => void; serverNow: number }) {
@@ -901,6 +903,7 @@ function Tabs({
     ['traders', 'Top traders'],
     ['early', 'Early buyers'],
     ['bubbles', 'Bubble map'],
+    ['map', 'Token map'],
     ['dev', "Dev's tokens"],
   ];
   return (

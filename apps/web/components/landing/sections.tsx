@@ -1,6 +1,5 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { preload } from 'react-dom';
 import { GithubLogo, TelegramLogo, XLogo } from '@phosphor-icons/react/dist/ssr';
 import type { RiskLevel, TokenCard, Trade } from '@/lib/api';
 import type { DexToken } from '@/lib/dexscreener';
