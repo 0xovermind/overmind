@@ -1,0 +1,19 @@
+# Local development database. Production uses Neon via Cloudflare Hyperdrive.
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: overmind-postgres
+    environment:
+      POSTGRES_USER: overmind
+      POSTGRES_PASSWORD: overmind
+      POSTGRES_DB: overmind
+    ports:
+      - '5433:5432'
+    volumes:
+      - overmind-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U overmind']
+      interval: 2s
+      retries: 20
+volumes:
+  overmind-pg:

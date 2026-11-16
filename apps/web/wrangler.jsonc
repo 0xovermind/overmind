@@ -1,0 +1,23 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "overmind-web",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  // Next.js page cache (see open-next.config.ts) and a binding to this worker for background revalidation.
+  "kv_namespaces": [{ "binding": "NEXT_INC_CACHE_KV", "id": "d3b832bd9fa54c1696edffc5802ad1d7" }],
+  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "overmind-web" }],
+  "observability": { "enabled": true },
+  // Per-IP limit for the browser RPC proxy (app/api/rpc): every call spends our Alchemy quota.
+  "ratelimits": [{ "name": "RPC_LIMIT", "namespace_id": "4663", "simple": { "limit": 300, "period": 60 } }],
+  // Served only on the custom domains; workers.dev and preview URLs would expose the account name.
+  "routes": [
+    { "pattern": "overmind.ink", "custom_domain": true },
+    { "pattern": "www.overmind.ink", "custom_domain": true },
+    { "pattern": "app.overmind.ink", "custom_domain": true }
+  ],
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": { "NEXT_PUBLIC_API_URL": "https://api.overmind.ink", "NEXT_PUBLIC_APP_URL": "https://app.overmind.ink" }
+}

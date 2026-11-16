@@ -1,0 +1,148 @@
+/*
+ * Overmind terminal palette: the landing's editorial print look, made for data. Parchment canvas,
+ * white panels, ink text and ink tints for lines and hovers. The only colour is gains / losses
+ * and the iridescent hive accents.
+ * Set on :root while the terminal is mounted, so dialogs and sheets portalled to <body> match too.
+ */
+:root:has(.terminal-ui) {
+  --color-bg: #e5e4e0;
+  --color-surface: #ffffff;
+  --color-surface-2: #efeee9;
+  --color-line: #cfcec9;
+  --color-ink: #1d1d1d;
+  --color-muted: #6b6a66;
+  --color-brand: #1d1d1d;
+  --color-brand-deep: #1d1d1d;
+  --color-lime: #1d1d1d;
+  --color-go: #1d1d1d;
+  --color-risk-high: #c8402f;
+  --color-risk-medium: #a8700e;
+  --color-risk-low: #2f7a3e;
+  color-scheme: light;
+}
+:root:has(.terminal-ui) body { background: #e5e4e0; }
+
+/*
+ * Thin, quiet scrollbars for every scroll area in the terminal: a rounded thumb (white at 15%,
+ * brighter while the area is hovered) on a transparent track.
+ * In the base layer, so utilities such as [scrollbar-width:none] still win.
+ */
+@layer base {
+  .terminal-ui,
+  .terminal-ui * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(29 29 29 / 0.15) transparent;
+  }
+
+  .terminal-ui *:hover {
+    scrollbar-color: rgb(29 29 29 / 0.28) transparent;
+  }
+
+  /* Browsers without the standard properties (older Safari) use the WebKit pseudo-elements. */
+  @supports not (scrollbar-color: auto) {
+    .terminal-ui ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .terminal-ui ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .terminal-ui ::-webkit-scrollbar-thumb {
+      background: rgb(29 29 29 / 0.15);
+      border-radius: 999px;
+    }
+    .terminal-ui ::-webkit-scrollbar-thumb:hover {
+      background: rgb(29 29 29 / 0.3);
+    }
+  }
+}
+
+/* Trenches row update: a soft gray lift that fades out (instead of a green tint). */
+@keyframes trench-flash {
+  from {
+    background: rgb(29 29 29 / 0.07);
+  }
+  to {
+    background: transparent;
+  }
+}
+.trench-flash {
+  animation: trench-flash 1.2s ease-out forwards;
+}
+
+/* ---------------------------------------------------------------- motion */
+
+/* A slow iridescent haze behind the panels: the hive sphere, out of focus. */
+.aurora {
+  background:
+    radial-gradient(40% 50% at 85% 0%, rgb(240 107 168 / 0.16), transparent 70%),
+    radial-gradient(35% 45% at 100% 30%, rgb(120 186 230 / 0.18), transparent 70%),
+    radial-gradient(30% 40% at 70% 10%, rgb(250 203 14 / 0.12), transparent 70%);
+}
+
+/* The hive score chip on trench cards and token pages. */
+.hive-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px;
+  font-family: var(--font-mono); font-size: 11px; line-height: 18px; white-space: nowrap;
+  border: 1px solid rgb(29 29 29 / 0.12); background: #fff;
+}
+.hive-chip i { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: linear-gradient(255deg, rgb(250,203,14), rgb(240,107,168) 30%, rgb(120,186,230) 65%, #fff); }
+.hive-chip.up { color: #2f7a3e; border-color: rgb(47 122 62 / 0.35); }
+.hive-chip.down { color: #c8402f; border-color: rgb(200 64 47 / 0.35); }
+
+/* Live dot: a ring that keeps expanding out of it. */
+.live-dot::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; background: inherit;
+}
+
+.radar > span {
+  position: absolute; inset: 0; border-radius: 50%; border: 1px solid rgb(29 29 29 / 0.35);
+}
+
+.trench-row > .group { transition: background-color 0.2s, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+.trench-row > .group::before {
+  content: ''; position: absolute; left: 0; top: 10%; bottom: 10%; width: 2px; border-radius: 2px;
+  background: linear-gradient(180deg, rgb(250,203,14), rgb(240,107,168), rgb(120,186,230));
+  transform: scaleY(0); transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.trench-row > .group:hover::before { transform: scaleY(1); }
+
+.nav-pill.is-active::after {
+  content: ''; position: absolute; left: 12px; right: 12px; bottom: -11px; height: 2px; border-radius: 2px;
+  background: linear-gradient(90deg, rgb(250,203,14), rgb(240,107,168) 40%, rgb(120,186,230));
+}
+
+@keyframes col-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes page-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ping { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(3.2); opacity: 0; } }
+@keyframes radar { 0% { transform: scale(0.2); opacity: 0.9; } 100% { transform: scale(1); opacity: 0; } }
+@keyframes tick { 0% { transform: translateY(-40%); opacity: 0; } 100% { transform: none; opacity: 1; } }
+@keyframes aurora { 0%, 100% { transform: translate3d(0, 0, 0) scale(1); } 50% { transform: translate3d(-4%, 3%, 0) scale(1.08); } }
+@keyframes brand-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: no-preference) {
+  .page-in { animation: page-in 0.4s ease-out both; }
+  .col-in { animation: col-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .col-in:nth-child(2) { animation-delay: 0.08s; }
+  .col-in:nth-child(3) { animation-delay: 0.16s; }
+  .col-in:nth-child(4) { animation-delay: 0.24s; }
+  .live-dot::after { animation: ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite; }
+  .radar > span { animation: radar 2.4s cubic-bezier(0, 0, 0.2, 1) infinite; }
+  .radar > span:nth-child(2) { animation-delay: 0.8s; }
+  .radar > span:nth-child(3) { animation-delay: 1.6s; }
+  .tick { animation: tick 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
+  .aurora { animation: aurora 18s ease-in-out infinite; }
+  .trench-row > .group:hover { transform: translateX(3px); }
+  .brand-link:hover img { animation: brand-spin 1.2s cubic-bezier(0.16, 1, 0.3, 1); }
+}
+
+.hive-orb { background: linear-gradient(255deg, rgb(250,203,14), rgb(240,107,168) 30%, rgb(120,186,230) 65%, #fff); }
+@keyframes pulse-in { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+@keyframes grow-x { from { transform: scaleX(0); } to { transform: none; } }
+@keyframes orb-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: no-preference) {
+  .pulse-card { animation: pulse-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .pulse-fill { animation: grow-x 1s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .hive-orb { animation: orb-spin 6s linear infinite; }
+}

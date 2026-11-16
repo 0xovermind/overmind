@@ -1,0 +1,675 @@
+import { DurableObject } from 'cloudflare:workers';
+import postgres, { type Sql } from 'postgres';
+import { PAIR_SWAP_TOPICS, ROBINHOOD_CHAIN, tradeTopics, type RawLog } from '@overmind/core';
+import { dbUrl, poolHistory, type Env } from './env';
+import { Pipeline, type BatchStats, type RangeStats } from './pipeline';
+import { tokenSummaries } from './api';
+import { columnOf, liftfunOn, tokenStats, type Column } from './data';
+import { updateCurveProgress } from './curves';
+import { GATEWAY_COUNT, gateway, type DeltaEvent } from './gateway';
+import type { FeedEvent } from './feed';
+import { Rpc } from './rpc';
+
+/** ~55s of blocks per getLogs call at 0.11s blocks. */
+const RANGE = 500n;
+/** Stop a catch-up loop after this long and reschedule, to stay well within alarm limits. */
+const BUDGET_MS = 20_000;
+/**
+ * Catch-up cap (after a pause or an outage): when the cursor is more than CATCHUP_LAG blocks behind
+ * (~9 min of chain), run at most CATCHUP_STEPS ranges per alarm and wait CATCHUP_GAP_MS between alarms:
+ * about 1,000 blocks/s (~110x real time), so a 24h pause catches up in ~15 min at ~2 getLogs/s instead
+ * of a tight loop.
+ */
+const CATCHUP_LAG = 5_000n;
+const CATCHUP_STEPS = 2;
+const CATCHUP_GAP_MS = 1_000;
+/** A poll step that takes longer than this is treated as hung (see resetDb). */
+const STEP_TIMEOUT_MS = 90_000;
+
+class StepTimeout extends Error {
+  override name = 'StepTimeout';
+}
+
+function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new StepTimeout(`${what} took over ${ms / 1000}s`)), ms);
+  });
+  return Promise.race([p, timeout]).finally(() => timer !== undefined && clearTimeout(timer));
+}
+/** Live logs are written in small batches this often. */
+const FLUSH_MS = 200;
+/** Once caught up, polling only confirms what the live path already wrote. */
+const POLL_MS = 2_000;
+/**
+ * Most v3/v2 pool addresses on the live pair-swap subscription (env PAIR_SUB_MAX overrides). Measured
+ * 2026-11-12: 276 pools ≈ 243 KB/min (≈10.5 GB/month), 150 pools ≈ 161 KB/min (≈7.1 GB/month), against
+ * an approved ~4.3 GB/month, so 75 by default; the rest arrive by polling 2-4s later.
+ */
+const PAIR_SUB_MAX = 75;
+/** Recompute a token's signals at most this often while it's trading. */
+const SIGNAL_DEBOUNCE_MS = 15_000;
+
+interface LiveStats {
+  connected: boolean;
+  logs: number;
+  batches: number;
+  swaps: number;
+  launches: number;
+  /** Block time → written to Postgres, for the last batch. */
+  lastLatencyMs: number | null;
+  reconnects: number;
+}
+
+/**
+ * Single instance ("main") that follows Robinhood Chain.
+ *
+ * Live path: an eth_subscribe("logs") WebSocket pushes trades, launches and migrations as blocks
+ * land; they are written every ~200ms. Polling path: alarms read confirmed block ranges with
+ * eth_getLogs from the cursor (every event, Transfers included), backfilling anything the socket
+ * missed. Writes are idempotent, so the two paths can overlap.
+ *
+ * Why Transfers aren't on the socket: Alchemy bills subscriptions per byte delivered, and Transfers
+ * for every token on the chain are ~80% of the volume. getLogs costs the same per call however much
+ * it returns, so holders and balances come from polling at a fraction of the cost (~2-4s behind).
+ */
+export class ChainPoller extends DurableObject<Env> {
+  private sql?: Sql;
+  private pipeline?: Pipeline;
+  /** Separate pipeline + queue for the live path, so a slow catch-up range never delays live trades. */
+  private livePipeline?: Pipeline;
+  private liveQueue: Promise<unknown> = Promise.resolve();
+  private last?: Pick<RangeStats, 'logs' | 'launches' | 'swaps' | 'transfers' | 'ms'> & {
+    from: string;
+    to: string;
+    head: string;
+    lag: number;
+  };
+
+  private ws?: WebSocket;
+  private buffer: RawLog[] = [];
+  private flushTimer?: ReturnType<typeof setTimeout>;
+  private live: LiveStats = { connected: false, logs: 0, batches: 0, swaps: 0, launches: 0, lastLatencyMs: null, reconnects: 0 };
+  private queue: Promise<unknown> = Promise.resolve();
+  private signalQueuedAt = new Map<string, number>();
+  /** Tokens first seen in the batch being queued (their signals take the fast lane). */
+  private freshTokens = new Set<string>();
+  /**
+   * Address-filtered subscription for v3/v2 swaps of tracked pools (LIVE_PAIRS=1). `key` is the
+   * address set it covers; a new set is subscribed first and the old one dropped once confirmed
+   * (same socket, no gap, no reconnect).
+   */
+  private pairSub: { id: string | null; key: string; pools: number; checkedAt: number; changedAt: number } = { id: null, key: '', pools: 0, checkedAt: 0, changedAt: 0 };
+  private pairPending?: { reqId: number; key: string; pools: number };
+  private nextReqId = 100;
+  private pairsDirty = true;
+  /** Realtime v2 (docs/realtime.md): sequence epoch, per-topic seq, and which gateway watches what. */
+  private epoch = `p-${Date.now()}`;
+  private seqs = new Map<string, number>();
+  private registry = new Map<number, Set<string>>();
+  private gatewaysGreeted = false;
+  /** Last trenches column published per token (to emit `move`). */
+  private columns = new Map<string, Column | null>();
+  private statsAt = 0;
+  private lastCards = new Map<string, string>();
+  private lastStats = new Map<string, string>();
+  /** Socket bytes received per subscription, for checking the Alchemy bandwidth estimate. */
+  private meter = { since: Date.now(), main: 0, pair: 0, other: 0, prev: null as null | { minutes: number; mainPerMin: number; pairPerMin: number } };
+
+  private init() {
+    if (!this.pipeline) {
+      // This object lives for hours, but Hyperdrive can drop idle connections without the client noticing
+      // (the next query on that socket then never returns). Keep connections short-lived.
+      // Workers allow 6 simultaneous outgoing connections per invocation: 3 for Postgres leaves room
+      // for the Alchemy socket and RPC fetches (more than 6 deadlocks: new sockets wait forever).
+      this.sql = postgres(dbUrl(this.env), {
+        max: 3,
+        fetch_types: false,
+        prepare: false,
+        idle_timeout: 15,
+        max_lifetime: 300,
+        connect_timeout: 10,
+      });
+      this.pipeline = new Pipeline(this.sql, new Rpc(this.env.RPC_URL));
+      this.livePipeline = new Pipeline(this.sql, new Rpc(this.env.RPC_URL));
+    }
+    return this.pipeline;
+  }
+
+  /**
+   * Live flushes run one at a time on their own lane. Writes are idempotent (keyed by tx/log index,
+   * balances and candles only applied for newly inserted rows), so the two lanes can overlap safely.
+   */
+  private liveSerial<T>(fn: (p: Pipeline) => Promise<T>): Promise<T> {
+    this.init();
+    const next = this.liveQueue.then(() => fn(this.livePipeline!));
+    this.liveQueue = next.catch(() => undefined);
+    return next;
+  }
+
+  /** Run pipeline work one job at a time (live flushes and polling ranges share in-memory state). */
+  private serial<T>(fn: () => Promise<T>): Promise<T> {
+    const next = this.queue.then(fn);
+    this.queue = next.catch(() => undefined);
+    return next;
+  }
+
+  async start(): Promise<void> {
+    // Paused (see pause.ts): the every-minute cron calls start(); it must not wake the poller.
+    if (await this.ctx.storage.get<boolean>('paused')) return;
+    await this.ctx.storage.put('enabled', true);
+    if ((await this.ctx.storage.getAlarm()) === null) await this.ctx.storage.setAlarm(Date.now() + 100);
+  }
+
+  /**
+   * Drop this instance so the next request loads the current deployment. A deploy doesn't replace a
+   * running poller on its own (its open socket and timers keep it busy). Alarm and storage survive.
+   */
+  async restart(): Promise<void> {
+    this.ws?.close(1000, 'restart');
+    this.ctx.abort('restart requested');
+  }
+
+  async stop(): Promise<void> {
+    await this.ctx.storage.put('enabled', false);
+    await this.ctx.storage.deleteAlarm();
+    this.ws?.close(1000, 'stopped');
+    this.ws = undefined;
+    this.live.connected = false;
+  }
+
+  /** Off switch: stop, close the socket, and refuse start() until resume(). */
+  async pause(): Promise<void> {
+    await this.ctx.storage.put('paused', true);
+    await this.stop();
+  }
+
+  /** Clear the pause and start from the stored cursor (catch-up is capped, see CATCHUP_LAG). */
+  async resume(): Promise<void> {
+    await this.ctx.storage.delete('paused');
+    await this.start();
+  }
+
+  /** Dev: index launch windows for tokens discovered mid-life, then queue their signals. */
+  async backfillLaunches(): Promise<number> {
+    const pipeline = this.init();
+    const tokens = await this.serial(() => pipeline.backfillMissingLaunches());
+    for (const t of tokens) this.signalQueuedAt.delete(t);
+    await this.queueSignals(tokens);
+    return tokens.length;
+  }
+
+  /**
+   * A hydrator persisted a token we didn't track: start indexing it on both lanes. Returns the cursor,
+   * so the caller knows which transfers we'll record from here (the holder backfill covers the rest).
+   */
+  async adopt(token: string): Promise<{ cursor: string | null }> {
+    const pipeline = this.init();
+    await Promise.all([pipeline.adoptToken(token), this.livePipeline!.adoptToken(token)]);
+    this.pairsDirty = true;
+    return { cursor: (await pipeline.cursor())?.toString() ?? null };
+  }
+
+  /** A gateway's full watched-topic set (debounced on its side). Returns the sequence epoch. */
+  async registerTopics(index: number, topics: string[]): Promise<{ epoch: string }> {
+    if (topics.length) this.registry.set(index, new Set(topics));
+    else this.registry.delete(index);
+    return { epoch: this.epoch };
+  }
+
+  /** Current seq per topic (a gateway asks before building a snapshot). */
+  async seqOf(topics: string[]): Promise<Record<string, number>> {
+    return Object.fromEntries(topics.map((t) => [t, this.seqs.get(t) ?? 0]));
+  }
+
+  /** Gateways keep their registrations in sync with our in-memory registry: greet them after a restart. */
+  private async greetGateways() {
+    if (this.gatewaysGreeted) return;
+    this.gatewaysGreeted = true;
+    await Promise.all(
+      [...Array(GATEWAY_COUNT).keys()].map((k) => gateway(this.env, k).hello(this.epoch).catch((err: unknown) => console.error('gateway hello failed', k, err))),
+    );
+  }
+
+  /** Send v2 events to the gateways watching their topics, numbering them per topic. */
+  private async sendV2(events: Omit<DeltaEvent, 'seq'>[]) {
+    if (!events.length || !this.registry.size) return;
+    const watchedBy = new Map<number, DeltaEvent[]>();
+    for (const e of events) {
+      const gws = [...this.registry].filter(([, set]) => set.has(e.topic)).map(([k]) => k);
+      if (!gws.length) continue;
+      const seq = (this.seqs.get(e.topic) ?? 0) + 1;
+      this.seqs.set(e.topic, seq);
+      for (const k of gws) watchedBy.set(k, [...(watchedBy.get(k) ?? []), { ...e, seq }]);
+    }
+    await Promise.all(
+      [...watchedBy].map(([k, evs]) => gateway(this.env, k).publish(this.epoch, evs).catch((err: unknown) => console.error('gateway publish failed', k, err))),
+    );
+  }
+
+  /** v2 `trades` and `candle` (1s/1m increments) per token, from a batch's new trades. */
+  private tradeDeltas(byToken: Map<string, BatchStats['trades']>): Omit<DeltaEvent, 'seq'>[] {
+    const out: Omit<DeltaEvent, 'seq'>[] = [];
+    for (const [token, trades] of byToken) {
+      const ordered = [...trades].sort((a, b) => a.time - b.time || a.logIndex - b.logIndex);
+      out.push({
+        topic: `token:${token}`, type: 'trades', source: 'index',
+        data: ordered.map((t) => ({
+          tx: t.tx, logIndex: t.logIndex, time: t.time, trader: t.trader, side: t.side, tokenAmount: t.tokenAmount,
+          quoteAmount: t.quoteAmount, quote: t.quote, pool: t.pool, priceUsd: t.priceUsd, usd: t.usd, tags: [],
+        })),
+      });
+      const ticks = new Map<string, { interval: '1s' | '1m'; time: number; open: number; high: number; low: number; close: number; volume: number; trades: number }>();
+      for (const t of ordered) {
+        if (t.priceUsd == null) continue;
+        for (const [interval, size] of [['1s', 1], ['1m', 60]] as const) {
+          const time = Math.floor(t.time / size) * size;
+          const k = `${interval}:${time}`;
+          const c = ticks.get(k);
+          if (!c) ticks.set(k, { interval, time, open: t.priceUsd, high: t.priceUsd, low: t.priceUsd, close: t.priceUsd, volume: t.usd ?? 0, trades: 1 });
+          else Object.assign(c, { high: Math.max(c.high, t.priceUsd), low: Math.min(c.low, t.priceUsd), close: t.priceUsd, volume: c.volume + (t.usd ?? 0), trades: c.trades + 1 });
+        }
+      }
+      if (ticks.size) out.push({ topic: `token:${token}`, type: 'candle', source: 'index', data: [...ticks.values()] });
+    }
+    return out;
+  }
+
+  /** v2 card updates: `token` on the token topic; `launch`/`token`/`move` on the trenches columns. */
+  private cardDeltas(cards: Record<string, unknown>[], fresh: Set<string>): Omit<DeltaEvent, 'seq'>[] {
+    const out: Omit<DeltaEvent, 'seq'>[] = [];
+    for (const card of cards) {
+      const address = card.address as string;
+      // Skip cards that didn't change since the last one sent (live and confirming paths both report).
+      const key = JSON.stringify(card);
+      if (!fresh.has(address) && this.lastCards.get(address) === key) continue;
+      this.lastCards.set(address, key);
+      out.push({ topic: `token:${address}`, type: 'token', source: 'index', data: card });
+      const col = columnOf(card, liftfunOn(this.env));
+      const prev = this.columns.has(address) ? this.columns.get(address)! : undefined;
+      this.columns.set(address, col);
+      if (fresh.has(address) && col === 'new') out.push({ topic: 'trenches:new', type: 'launch', source: 'index', data: card });
+      else if (prev !== undefined && prev !== col) {
+        // Moved: tell both columns (a token can also leave or enter the default view, e.g. flagged as spam).
+        const data = { address, from: prev, to: col, card };
+        if (prev) out.push({ topic: `trenches:${prev}`, type: 'move', source: 'index', data });
+        if (col) out.push({ topic: `trenches:${col}`, type: 'move', source: 'index', data });
+      } else if (col) out.push({ topic: `trenches:${col}`, type: 'token', source: 'index', data: card });
+    }
+    if (this.columns.size > 50_000) this.columns.clear();
+    if (this.lastCards.size > 20_000) this.lastCards.clear();
+    return out;
+  }
+
+  /** Card changes from outside the poller (signals, metadata): numbered here, the single writer. */
+  async publishCards(cards: Record<string, unknown>[]): Promise<void> {
+    await this.sendV2(this.cardDeltas(cards, new Set()));
+  }
+
+  /** Every ~15s: bonding progress of PONS curves that traded recently, from their reserves. */
+  private curvesAt = 0;
+  private async tickCurves() {
+    if (Date.now() - this.curvesAt < 15_000 || !this.sql) return;
+    this.curvesAt = Date.now();
+    try {
+      await updateCurveProgress(this.sql, new Rpc(this.env.RPC_URL), { activeSeconds: 30 });
+    } catch (err) {
+      console.error('curve progress failed', err);
+    }
+  }
+
+  private watchedTokens(): string[] {
+    const out = new Set<string>();
+    for (const set of this.registry.values()) for (const t of set) if (t.startsWith('token:')) out.add(t.slice(6));
+    return [...out];
+  }
+
+  /** Every ~5s: window stats for watched tokens, sent when they changed. One query for all of them. */
+  private async tickStats() {
+    if (Date.now() - this.statsAt < 5_000 || !this.sql) return;
+    this.statsAt = Date.now();
+    const tokens = this.watchedTokens();
+    if (!tokens.length) return;
+    try {
+      const stats = await tokenStats(this.sql, tokens);
+      const events: Omit<DeltaEvent, 'seq'>[] = [];
+      for (const [token, st] of stats) {
+        const { asOf, ...windows } = st;
+        const key = JSON.stringify(windows);
+        if (this.lastStats.get(token) === key) continue;
+        this.lastStats.set(token, key);
+        events.push({ topic: `token:${token}`, type: 'stats', source: 'index', data: { ...windows, asOf } });
+      }
+      if (this.lastStats.size > 5_000) this.lastStats.clear();
+      await this.sendV2(events);
+    } catch (err) {
+      console.error('stats tick failed', err);
+    }
+  }
+
+  async status() {
+    const pipeline = this.init();
+    const cursor = await pipeline.cursor();
+    return {
+      cursor: cursor?.toString() ?? null,
+      running: (await this.ctx.storage.getAlarm()) !== null,
+      paused: (await this.ctx.storage.get<boolean>('paused')) ?? false,
+      live: {
+        ...this.live,
+        pairPools: this.env.LIVE_PAIRS === '1' ? this.pairSub.pools : null,
+        socketBytes: this.meterStats(),
+      },
+      last: this.last ?? null,
+      attempt: (await this.ctx.storage.get('attempt')) ?? null,
+      stage: (await this.ctx.storage.get('stage')) ?? null,
+      alarmAt: await this.ctx.storage.getAlarm(),
+      lastError: (await this.ctx.storage.get('lastError')) ?? null,
+      previousError: (await this.ctx.storage.get('previousError')) ?? null,
+    };
+  }
+
+  /** Where the alarm loop is, for /health (a hang shows up as a stage that stops changing). */
+  private async stage(name: string) {
+    await this.ctx.storage.put('stage', { name, at: new Date().toISOString() });
+  }
+
+  override async alarm(): Promise<void> {
+    await this.stage('alarm');
+    if (!(await this.ctx.storage.get<boolean>('enabled')) || (await this.ctx.storage.get<boolean>('paused'))) return;
+    const pipeline = this.init();
+    await this.openSocket();
+    await this.stage('socket');
+    await this.greetGateways();
+    const rpc = new Rpc(this.env.RPC_URL);
+    const started = Date.now();
+    let caughtUp = false;
+    let throttled = false;
+    let steps = 0;
+    try {
+      const head = (await rpc.blockNumber()) - BigInt(ROBINHOOD_CHAIN.confirmations);
+      await this.stage('head');
+      let cursor: bigint = (await pipeline.cursor()) ?? head - BigInt(this.env.START_BLOCKS_BACK ?? '33000');
+      // A range that never finished (the isolate was killed mid-step, e.g. on a huge airdrop) is retried
+      // at half the size, so one heavy range can't stall indexing.
+      // The range then grows back (doubling per finished step) once the busy stretch is behind us.
+      const unfinished = await this.ctx.storage.get<{ from: string; range: string }>('attempt');
+      let range =
+        unfinished && BigInt(unfinished.from) === cursor + 1n
+          ? BigInt(unfinished.range) / 2n || 1n
+          : BigInt((await this.ctx.storage.get<string>('range')) ?? RANGE.toString());
+      if (unfinished) console.warn(`poller: retrying ${cursor + 1n} with a ${range}-block range`);
+      while (Date.now() - started < BUDGET_MS) {
+        if (cursor >= head) {
+          caughtUp = true;
+          break;
+        }
+        if (head - cursor > CATCHUP_LAG && steps >= CATCHUP_STEPS) {
+          throttled = true;
+          break;
+        }
+        steps++;
+        const from = cursor + 1n;
+        const to: bigint = cursor + range > head ? head : cursor + range;
+        await this.ctx.storage.put('attempt', { from: from.toString(), range: range.toString() });
+        await this.stage(`step ${from}-${to}`);
+        const stats = await withTimeout(this.serial(() => pipeline.run(from, to)), STEP_TIMEOUT_MS, `poll ${from}-${to}`);
+        range = range * 2n > RANGE ? RANGE : range * 2n;
+        await this.ctx.storage.put('range', range.toString());
+        await this.ctx.storage.delete('attempt');
+        cursor = to;
+        for (const t of stats.newTokens) this.freshTokens.add(t);
+        await this.queueSignals([...stats.newTokens, ...stats.touched]);
+        await this.queueMetadata(stats.newTokens);
+        await this.handOffPools(pipeline);
+        await this.publish(stats, 'poll');
+        this.last = {
+          logs: stats.logs, launches: stats.launches, swaps: stats.swaps, transfers: stats.transfers, ms: stats.ms,
+          from: from.toString(), to: to.toString(), head: head.toString(), lag: Number(head - cursor),
+        };
+        if (stats.swaps || stats.launches) {
+          console.log(
+            `poll ${from}-${to}: backfilled ${stats.launches} launches, ${stats.swaps} swaps, ${stats.transfers} transfers (${stats.ms}ms, lag ${this.last.lag})`,
+          );
+        }
+      }
+    } catch (err) {
+      console.error('poller error', err);
+      const message = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+      await this.ctx.storage.put('lastError', { at: new Date().toISOString(), message: message.slice(0, 500) });
+      if (err instanceof StepTimeout) await this.resetDb();
+      await this.ctx.storage.setAlarm(Date.now() + 5_000);
+      return;
+    }
+    if (caughtUp) await this.tickStats();
+    if (caughtUp) await this.tickCurves();
+    // /health shows the last error until 15 error-free minutes have passed; then it moves to previousError.
+    const lastError = await this.ctx.storage.get<{ at: string; message: string }>('lastError');
+    if (lastError && Date.now() - Date.parse(lastError.at) > 15 * 60_000) {
+      await this.ctx.storage.put('previousError', lastError);
+      await this.ctx.storage.delete('lastError');
+    }
+    await this.ctx.storage.setAlarm(Date.now() + (caughtUp ? POLL_MS : throttled ? CATCHUP_GAP_MS : 10));
+  }
+
+  /** Drop every connection and start over (after a hung step). In-flight work on the old pool is abandoned. */
+  private async resetDb() {
+    const old = this.sql;
+    this.sql = undefined;
+    this.pipeline = undefined;
+    this.livePipeline = undefined;
+    this.queue = Promise.resolve();
+    this.liveQueue = Promise.resolve();
+    await old?.end({ timeout: 0 }).catch(() => undefined);
+  }
+
+  /** Pools discovery just added: replay their recent swaps (pool-history backfill), and stream them live. */
+  private async handOffPools(p: Pipeline) {
+    const ids = p.takeDiscoveredPools();
+    if (!ids.length) return;
+    this.pairsDirty = true;
+    try {
+      await poolHistory(this.env).enqueuePools(ids);
+    } catch (err) {
+      console.error('pool history enqueue failed', err);
+    }
+  }
+
+  /**
+   * Keep the pair-swap subscription in step with the v3/v2 pools worth streaming: the pools of the
+   * tracked tokens with the most 24h volume, capped at PAIR_SUB_MAX addresses (the rest arrive via
+   * polling, 2-4s later). Re-checked every 60s when discovery added pools, else every 5 min, and only
+   * re-subscribed when the address set actually changed.
+   */
+  private async syncPairSubscription() {
+    if (this.env.LIVE_PAIRS !== '1' || !this.ws || !this.live.connected || !this.sql || this.pairPending) return;
+    const since = Date.now() - this.pairSub.checkedAt;
+    if (since < (this.pairsDirty ? 60_000 : 300_000)) return;
+    this.pairSub.checkedAt = Date.now();
+    this.pairsDirty = false;
+    const rows = await this.sql<{ id: string }[]>`
+      select p.id from pools p join tokens t on t.address = p.token
+      where p.dex in ('v3', 'v2')
+      order by t.volume_24h_usd desc nulls last, p.created_at desc
+      limit ${Number(this.env.PAIR_SUB_MAX ?? PAIR_SUB_MAX)}`;
+    const ids = rows.map((r) => r.id).sort();
+    const key = ids.join(',');
+    if (!ids.length || key === this.pairSub.key) return;
+    const reqId = ++this.nextReqId;
+    this.pairPending = { reqId, key, pools: ids.length };
+    this.ws.send(JSON.stringify({ jsonrpc: '2.0', id: reqId, method: 'eth_subscribe', params: ['logs', { address: ids, topics: [PAIR_SWAP_TOPICS] }] }));
+  }
+
+  private meterStats() {
+    const minutes = (Date.now() - this.meter.since) / 60_000;
+    const per = (b: number) => (minutes > 0 ? Math.round(b / minutes) : null);
+    return {
+      minutes: Math.round(minutes * 10) / 10,
+      mainPerMin: per(this.meter.main),
+      pairPerMin: per(this.meter.pair),
+      otherPerMin: per(this.meter.other),
+      previousHour: this.meter.prev,
+    };
+  }
+
+  /** Open (or keep) the eth_subscribe socket. Called on every alarm, so a drop reconnects within ~2s. */
+  private async openSocket(): Promise<void> {
+    if (this.ws) {
+      await this.syncPairSubscription().catch((err) => console.error('pair subscription failed', err));
+      return;
+    }
+    this.pairSub = { id: null, key: '', pools: 0, checkedAt: 0, changedAt: 0 };
+    this.pairPending = undefined;
+    try {
+      const res = await fetch(this.env.RPC_URL, { headers: { Upgrade: 'websocket' } });
+      const ws = res.webSocket;
+      if (!ws) throw new Error(`no websocket (HTTP ${res.status})`);
+      ws.accept();
+      this.ws = ws;
+      if (this.live.batches) this.live.reconnects++;
+      ws.addEventListener('message', (event) => this.onMessage(event.data));
+      const drop = () => {
+        if (this.ws === ws) this.ws = undefined;
+        this.live.connected = false;
+      };
+      ws.addEventListener('close', drop);
+      ws.addEventListener('error', drop);
+      ws.send(
+        // Trades, launches and migrations only. ERC-20 Transfers (~80% of the chain's logs, and
+        // Alchemy bills socket traffic per byte) come from the polling path instead, ~2-4s later.
+        JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_subscribe', params: ['logs', { topics: [tradeTopics()] }] }),
+      );
+    } catch (err) {
+      console.error('websocket connect failed', err);
+      this.ws = undefined;
+    }
+  }
+
+  /** Push new trades and refreshed token cards to browsers via the LiveFeed DO. */
+  private async publish(stats: BatchStats, source: 'live' | 'poll') {
+    if (!stats.trades.length && !stats.newTokens.length) return;
+    try {
+      const feed = this.env.LIVE_FEED.get(this.env.LIVE_FEED.idFromName('global'));
+      // Trades go out first, straight from the decoded logs, so token pages tick without waiting on a query.
+      const byToken = new Map<string, BatchStats['trades']>();
+      for (const t of stats.trades) byToken.set(t.token, [...(byToken.get(t.token) ?? []), t]);
+      const tradeEvents: FeedEvent[] = [...byToken].map(([token, trades]) => ({ topic: `token:${token}`, type: 'trades', data: trades, source }));
+      if (tradeEvents.length) await feed.publish(tradeEvents);
+      // v2: trades and candle ticks first too.
+      await this.sendV2(this.tradeDeltas(byToken));
+
+      const events: FeedEvent[] = [];
+      const changed = [...new Set([...stats.newTokens, ...byToken.keys()])];
+      let cards: Record<string, unknown>[] = [];
+      if (changed.length && this.sql) {
+        cards = await tokenSummaries(this.sql, { addresses: changed });
+        const fresh = new Set(stats.newTokens);
+        // Block time of the newest log for each token, so clients can show feed latency.
+        const seenAt = new Map<string, number>();
+        for (const t of stats.trades) seenAt.set(t.token, Math.max(seenAt.get(t.token) ?? 0, t.time));
+        for (const card of cards) {
+          const data = { ...card, block_time: seenAt.get(card.address as string) ?? null };
+          events.push({ topic: 'trenches', type: fresh.has(card.address as string) ? 'launch' : 'token', data, source });
+          events.push({ topic: `token:${card.address}`, type: 'token', data, source });
+        }
+      }
+      if (events.length) await feed.publish(events);
+      await this.sendV2(this.cardDeltas(cards, new Set(stats.newTokens)));
+    } catch (err) {
+      console.error('publish failed', err);
+    }
+  }
+
+  /** Resolve icon and socials for newly seen tokens (once each; the queue retries failures). */
+  private async queueMetadata(tokens: string[]) {
+    for (let i = 0; i < tokens.length; i += 100) {
+      await this.env.METADATA_QUEUE.sendBatch(tokens.slice(i, i + 100).map((token) => ({ body: { kind: 'token-metadata' as const, token } })));
+    }
+  }
+
+  /** Ask the enrich queue to recompute signals, debounced per token. */
+  private async queueSignals(tokens: string[]) {
+    const now = Date.now();
+    const due = [...new Set(tokens)].filter((t) => now - (this.signalQueuedAt.get(t) ?? 0) >= SIGNAL_DEBOUNCE_MS);
+    if (!due.length) return;
+    for (const t of due) this.signalQueuedAt.set(t, now);
+    if (this.signalQueuedAt.size > 20_000) {
+      for (const [t, at] of this.signalQueuedAt) if (now - at > 10 * 60_000) this.signalQueuedAt.delete(t);
+    }
+    // Brand-new tokens go through the metadata queue (small batches, ~1s): their safety badges should
+    // land within seconds, not behind recomputes of busy tokens. The consumer handles any kind on either.
+    const fresh = due.filter((t) => this.freshTokens.has(t));
+    const rest = due.filter((t) => !this.freshTokens.has(t));
+    for (const [queue, list] of [[this.env.METADATA_QUEUE, fresh], [this.env.ENRICH_QUEUE, rest]] as const) {
+      for (let i = 0; i < list.length; i += 100) {
+        await queue.sendBatch(list.slice(i, i + 100).map((token) => ({ body: { kind: 'token-signals' as const, token } })));
+      }
+    }
+    this.freshTokens.clear();
+  }
+
+  private onMessage(data: string | ArrayBuffer) {
+    const text = typeof data === 'string' ? data : new TextDecoder().decode(data);
+    const msg = JSON.parse(text) as {
+      id?: number;
+      error?: { message: string };
+      result?: string;
+      params?: { subscription?: string; result: RawLog };
+    };
+    // Meter bytes per subscription (Alchemy bills socket traffic per byte); roll the window hourly.
+    const bytes = typeof data === 'string' ? text.length : data.byteLength;
+    if (msg.params?.subscription && msg.params.subscription === this.pairSub.id) this.meter.pair += bytes;
+    else if (msg.params?.subscription) this.meter.main += bytes;
+    else this.meter.other += bytes;
+    if (Date.now() - this.meter.since > 3_600_000) {
+      const s = this.meterStats();
+      this.meter = { since: Date.now(), main: 0, pair: 0, other: 0, prev: { minutes: s.minutes, mainPerMin: s.mainPerMin ?? 0, pairPerMin: s.pairPerMin ?? 0 } };
+    }
+    if (msg.id === 1) {
+      if (msg.error) console.error('eth_subscribe failed', msg.error.message);
+      else this.live.connected = true;
+      return;
+    }
+    if (this.pairPending && msg.id === this.pairPending.reqId) {
+      const pending = this.pairPending;
+      this.pairPending = undefined;
+      if (msg.error || !msg.result) {
+        console.error('pair eth_subscribe failed', msg.error?.message);
+        return;
+      }
+      // New set is live: drop the old one (same socket, so nothing is missed in between).
+      const old = this.pairSub.id;
+      this.pairSub = { ...this.pairSub, id: msg.result, key: pending.key, pools: pending.pools, changedAt: Date.now() };
+      if (old) this.ws?.send(JSON.stringify({ jsonrpc: '2.0', id: ++this.nextReqId, method: 'eth_unsubscribe', params: [old] }));
+      return;
+    }
+    if (msg.id !== undefined) return; // unsubscribe acks
+    if (!msg.params?.result) return;
+    this.buffer.push(msg.params.result);
+    this.flushTimer ??= setTimeout(() => void this.flush(), FLUSH_MS);
+  }
+
+  private async flush() {
+    this.flushTimer = undefined;
+    const logs = this.buffer;
+    this.buffer = [];
+    if (!logs.length) return;
+    try {
+      const stats = await this.liveSerial((p) => p.ingest(logs));
+      for (const t of stats.newTokens) this.freshTokens.add(t);
+        await this.queueSignals([...stats.newTokens, ...stats.touched]);
+      await this.queueMetadata(stats.newTokens);
+      await this.handOffPools(this.livePipeline!);
+      await this.publish(stats, 'live');
+      const newest = Math.max(...logs.map((l) => (l.blockTimestamp ? Number(l.blockTimestamp) : 0)));
+      this.live.logs += logs.length;
+      this.live.batches++;
+      this.live.swaps += stats.swaps;
+      this.live.launches += stats.launches;
+      this.live.lastLatencyMs = newest ? Date.now() - newest * 1000 : null;
+      if (stats.launches) console.log(`live: ${stats.launches} new tokens ${stats.newTokens.join(', ')}`);
+    } catch (err) {
+      // The polling path picks these blocks up from the cursor.
+      console.error('live flush failed', err);
+    }
+  }
+}

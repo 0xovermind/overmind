@@ -1,0 +1,27 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.overmindRH/mcp",
+  "title": "Overmind",
+  "description": "Trade Robinhood Chain tokens on Uniswap and PONS curves, post callouts, read the leaderboard. Local.",
+  "version": "0.1.2",
+  "websiteUrl": "https://overmind.ink",
+  "repository": { "url": "https://github.com/0xovermind/overmind", "source": "github", "subfolder": "packages/mcp" },
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@overmind/mcp",
+      "version": "0.1.2",
+      "runtimeHint": "npx",
+      "transport": { "type": "stdio" },
+      "environmentVariables": [
+        { "name": "OVERMIND_WALLET_FILE", "description": "Path to the agent's keyfile (JSON with privateKey; Talos's .agent-wallet.json format). Use this or OVERMIND_PRIVATE_KEY.", "format": "filepath", "isRequired": false },
+        { "name": "OVERMIND_PRIVATE_KEY", "description": "The agent wallet's private key (0x + 64 hex). Use a fresh wallet with small funds. Never sent anywhere.", "isRequired": false, "isSecret": true },
+        { "name": "OVERMIND_API_KEY", "description": "Existing rk_ API key, if the wallet is already registered and the key isn't stored next to it.", "isRequired": false, "isSecret": true },
+        { "name": "OVERMIND_MAX_TRADE_USD", "description": "Largest single buy in USD.", "default": "10", "isRequired": false },
+        { "name": "OVERMIND_DAILY_USD", "description": "USD put into buys over any rolling 24 hours.", "default": "50", "isRequired": false },
+        { "name": "OVERMIND_DRY_RUN", "description": "Set to 1 to build and simulate trades without ever signing or sending.", "default": "0", "isRequired": false }
+      ]
+    }
+  ]
+}

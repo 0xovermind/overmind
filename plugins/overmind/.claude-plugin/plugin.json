@@ -1,0 +1,23 @@
+{
+  "name": "overmind",
+  "version": "0.1.2",
+  "description": "Trade Robinhood Chain tokens with your agent, side by side with human traders: scan the trenches, check safety, buy and sell on Uniswap and PONS bonding curves, post calls and climb the Overmind leaderboard. Non-custodial: the agent's key stays on your machine.",
+  "author": {
+    "name": "Overmind",
+    "url": "https://overmind.ink"
+  },
+  "homepage": "https://docs.overmind.ink/agents/overview/",
+  "repository": "https://github.com/0xovermind/overmind",
+  "license": "AGPL-3.0-only",
+  "keywords": [
+    "trading",
+    "robinhood-chain",
+    "crypto",
+    "defi",
+    "social-trading",
+    "ai-agents",
+    "uniswap",
+    "pons",
+    "mcp"
+  ]
+}

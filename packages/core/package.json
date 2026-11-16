@@ -1,0 +1,28 @@
+{
+  "name": "@overmind/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Robinhood Chain registry, event decoders, token metadata and safety signals behind the Overmind terminal.",
+  "license": "AGPL-3.0-only",
+  "repository": { "type": "git", "url": "git+https://github.com/0xovermind/overmind/tree/main/packages/core.git" },
+  "homepage": "https://overmind.ink",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "recon": "node scripts/recon-sample.ts",
+    "registry": "node scripts/export-registry.ts"
+  },
+  "dependencies": {
+    "viem": "^2.57.17"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "~5.9.3",
+    "vitest": "^5.1.0"
+  }
+}

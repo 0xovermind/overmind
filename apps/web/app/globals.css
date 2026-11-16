@@ -1,0 +1,240 @@
+@import 'tailwindcss';
+
+/*
+ * Overmind tokens. The terminal is dark (near-black with a green cast). The landing page swaps the
+ * same tokens for the paper palette of the pencil-sketch art (.theme-paper), and any dark product
+ * shot inside it switches back with .theme-terminal.
+ */
+/*
+ * Overmind tokens. Landing (.theme-paper) follows an editorial print look: warm parchment canvas,
+ * ink text, white cards, ash hairlines, one iridescent sphere in the hero. The terminal is the same
+ * palette inverted (ink canvas, parchment text). No brand hue: the accent is ink itself.
+ */
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --color-bg: #121212;
+  --color-surface: #1a1a1a;
+  --color-surface-2: #222221;
+  --color-line: #2c2c2b;
+  --color-ink: #e5e4e0;
+  --color-muted: #8f8e8a;
+  --color-brand: #e5e4e0;
+  --color-brand-deep: #bfbebe;
+  --color-lime: #e5e4e0;
+  --color-risk-high: #ff6b5b;
+  --color-risk-medium: #ffb547;
+  --color-risk-low: #8fd19e;
+  --color-go: #e5e4e0;
+  --color-sage: #8f8e8a;
+  --color-parchment: #e5e4e0;
+  --color-paper: #ffffff;
+  --color-ash: #bfbebe;
+  --color-stone: #cdcdc9;
+}
+
+.theme-paper {
+  --color-bg: #e5e4e0;
+  --color-surface: #ffffff;
+  --color-surface-2: #cdcdc9;
+  --color-line: #bfbebe;
+  --color-ink: #1d1d1d;
+  --color-muted: #5c5b58;
+  --color-brand: #1d1d1d;
+  --color-brand-deep: #1d1d1d;
+  --color-lime: #1d1d1d;
+  --color-go: #1d1d1d;
+  --color-risk-high: #c8402f;
+  --color-risk-medium: #a8700e;
+  --color-risk-low: #2f7a3e;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  color-scheme: light;
+}
+
+.theme-terminal {
+  --color-bg: #121212;
+  --color-surface: #1a1a1a;
+  --color-surface-2: #222221;
+  --color-line: #2c2c2b;
+  --color-ink: #e5e4e0;
+  --color-muted: #8f8e8a;
+  --color-brand: #e5e4e0;
+  --color-brand-deep: #bfbebe;
+  --color-lime: #e5e4e0;
+  --color-go: #e5e4e0;
+  --color-risk-high: #ff6b5b;
+  --color-risk-medium: #ffb547;
+  --color-risk-low: #8fd19e;
+  color: var(--color-ink);
+  color-scheme: dark;
+}
+
+/* Overscroll and the page behind the landing match the paper. */
+body:has(.theme-paper) {
+  background: #e5e4e0;
+}
+
+html {
+  scroll-behavior: smooth;
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+::selection {
+  background: var(--color-ink);
+  color: var(--color-bg);
+}
+
+/* Hero entrance: pure CSS so the hero is visible in server HTML (no JS needed for LCP). */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* Slow drift for the avatars orbiting the closing call to action. */
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .rise {
+    animation: rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .bob {
+    animation: bob 6s ease-in-out infinite;
+  }
+}
+
+/* Terminal: a row lights up briefly when its token launches or its market cap moves. */
+@keyframes row-flash {
+  from {
+    background: rgba(229, 228, 224, 0.12);
+  }
+  to {
+    background: transparent;
+  }
+}
+.row-flash {
+  animation: row-flash 1.2s ease-out forwards;
+}
+
+/* ---- editorial landing pieces ---- */
+.sphere {
+  border-radius: 9999px;
+  background: linear-gradient(255deg, rgb(250, 203, 14), rgb(240, 107, 168) 30%, rgb(120, 186, 230) 65%, rgb(255, 255, 255));
+}
+.rings {
+  border-radius: 9999px;
+  border: 1px solid #bfbebe;
+}
+.label {
+  font-size: 11px;
+  line-height: 1.4;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.display {
+  font-weight: 400;
+  line-height: 0.8;
+  letter-spacing: 0.013em;
+  text-transform: uppercase;
+}
+.grid-paper {
+  background-color: #ffffff;
+  background-image: linear-gradient(#e5e4e0 1px, transparent 1px), linear-gradient(90deg, #e5e4e0 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+.ghost-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 10px;
+  padding: 5px 0;
+  font-size: 15px;
+  text-underline-offset: 4px;
+}
+.ghost-link:hover { text-decoration: underline; }
+.pill-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid currentColor;
+  border-radius: 10px;
+  padding: 10px 19px;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  transition: background-color 0.15s, color 0.15s;
+}
+.pill-btn:hover { background: var(--color-ink); color: var(--color-bg); }
+.pill-btn.solid { background: var(--color-ink); color: var(--color-bg); }
+.pill-btn.solid:hover { background: transparent; color: var(--color-ink); }
+
+/* ---- landing motion (all off under reduced motion) ---- */
+.line-mask { display: block; overflow: hidden; padding-bottom: 0.06em; margin-bottom: -0.06em; }
+.line-up { display: block; }
+.ring-breathe { transform: translate(-50%, -50%); }
+.orbit { transform: translate(-50%, -50%); }
+.ticker-track { will-change: transform; }
+.ghost-link .arrow, .pill-btn { transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.15s, color 0.15s; }
+.ghost-link .arrow { display: inline-block; }
+.ghost-link:hover .arrow { transform: translateX(6px); }
+.lift { transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s; }
+.lift:hover { transform: translateY(-4px); border-color: var(--color-ink); }
+
+@keyframes line-up { from { transform: translateY(105%); } to { transform: none; } }
+@keyframes sphere-in { from { transform: scale(0.6); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes sphere-spin { to { transform: rotate(360deg); } }
+@keyframes ring-breathe {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  50% { transform: translate(-50%, -50%) scale(1.035); opacity: 0.55; }
+}
+@keyframes orbit { to { transform: translate(-50%, -50%) rotate(360deg); } }
+@keyframes orbit-rev { to { transform: translate(-50%, -50%) rotate(-360deg); } }
+@keyframes ticker { to { transform: translateX(-50%); } }
+@keyframes nudge-down { 0%, 100% { transform: none; } 50% { transform: translateY(4px); } }
+
+@media (prefers-reduced-motion: no-preference) {
+  .line-up { animation: line-up 0.9s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .sphere-in > .sphere { animation: sphere-in 1.2s cubic-bezier(0.16, 1, 0.3, 1) both, sphere-spin 40s linear 1.2s infinite; }
+  .ring-breathe { animation: ring-breathe 6s ease-in-out infinite; }
+  .orbit { animation: orbit 24s linear infinite; }
+  .orbit-rev { animation: orbit-rev 36s linear infinite; }
+  .ticker-track { animation: ticker 38s linear infinite; }
+  .ticker:hover .ticker-track { animation-play-state: paused; }
+  .nudge-down { animation: nudge-down 1.6s ease-in-out infinite; }
+}
+
+/* hive board: rows rise in, gauges grow out from the centre */
+@keyframes gauge-grow { from { transform: scaleX(0); } to { transform: none; } }
+@keyframes row-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: no-preference) {
+  .gauge-fill { animation: gauge-grow 1.1s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .gauge-fill[style*='left'] { transform-origin: left; }
+  .gauge-fill[style*='right'] { transform-origin: right; }
+  .hive-row { animation: row-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
+}

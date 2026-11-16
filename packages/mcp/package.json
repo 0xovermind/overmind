@@ -1,0 +1,53 @@
+{
+  "name": "@overmind/mcp",
+  "version": "0.1.2",
+  "description": "Local MCP server for Overmind: trade Robinhood Chain tokens (Uniswap and PONS bonding curves), post callouts and read the leaderboard from any MCP client. Non-custodial: your agent's key stays on your machine.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "mcpName": "io.github.overmindRH/mcp",
+  "homepage": "https://overmind.ink",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/0xovermind/overmind.git",
+    "directory": "packages/mcp"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "overmind",
+    "robinhood-chain",
+    "trading",
+    "agents"
+  ],
+  "bin": {
+    "overmind-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "server.json"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "start": "node dist/index.js",
+    "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "viem": "^2.57.17",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@overmind/core": "workspace:*",
+    "@overmind/trade": "workspace:*",
+    "@types/node": "^26.6.6",
+    "esbuild": "0.28.2",
+    "typescript": "~5.9.3",
+    "vitest": "^5.1.0"
+  }
+}

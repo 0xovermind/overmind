@@ -1,0 +1,432 @@
+import { decodeFunctionResult, encodeFunctionData, parseAbi, toFunctionSelector, type Address, type Hex } from 'viem';
+import { ABIS, NATIVE_ETH, QUOTES, UNISWAP, type RawLog } from '@overmind/core';
+
+interface RpcResponse<T> {
+  id: number;
+  result?: T;
+  error?: { code: number; message: string };
+}
+
+export interface TokenMetadata {
+  token: Address;
+  name: string;
+  symbol: string;
+  decimals: number;
+  totalSupply: bigint;
+  /** Block totalSupply was read at; null = unknown (call failed, or read at 'latest'). */
+  supplyBlock: bigint | null;
+}
+
+const PUBLIC_LOGS_RPC = 'https://rpc.mainnet.chain.robinhood.com';
+
+export class Rpc {
+  private id = 0;
+  constructor(private url: string) {}
+
+  async call<T>(method: string, params: unknown[], timeoutMs = 30_000): Promise<T> {
+    const res = await this.post({ jsonrpc: '2.0', id: ++this.id, method, params }, timeoutMs);
+    const body = (await res.json()) as RpcResponse<T>;
+    if (body.error) throw new Error(`${method}: ${body.error.message}`);
+    return body.result as T;
+  }
+
+  async batch<T>(calls: { method: string; params: unknown[] }[]): Promise<(T | null)[]> {
+    if (calls.length === 0) return [];
+    const start = this.id;
+    const res = await this.post(calls.map((c, i) => ({ jsonrpc: '2.0', id: start + i + 1, ...c })));
+    this.id += calls.length;
+    const body = (await res.json()) as RpcResponse<T>[];
+    const byId = new Map(body.map((r) => [r.id, r]));
+    return calls.map((_, i) => byId.get(start + i + 1)?.result ?? null);
+  }
+
+  async blockNumber(): Promise<bigint> {
+    return BigInt(await this.call<Hex>('eth_blockNumber', []));
+  }
+
+  /** One OR-filtered getLogs over [from, to]. */
+  async logs(from: bigint, to: bigint, topics: Hex[]): Promise<RawLog[]> {
+    return this.call<RawLog[]>('eth_getLogs', [
+      { fromBlock: `0x${from.toString(16)}`, toBlock: `0x${to.toString(16)}`, topics: [topics] },
+    ]);
+  }
+
+  /**
+   * name/symbol/decimals/totalSupply for many tokens in one batch. Missing values come back empty.
+   * Read at one explicit block, returned as `supplyBlock`: mints and burns after it change the supply
+   * (see tokens.supply_block). Costs one eth_blockNumber per call.
+   */
+  async tokenMetadata(tokens: Address[]): Promise<TokenMetadata[]> {
+    if (!tokens.length) return [];
+    const head = await this.blockNumber();
+    const pinned = await this.metadataAt(tokens, `0x${head.toString(16)}`, head);
+    // A node a block behind the one that answered eth_blockNumber has no state at `head` (or no contract
+    // yet): read those at 'latest' instead, with the supply block unknown (never adjusted, re-read later).
+    const missed = tokens.filter((_, i) => pinned[i]!.supplyBlock == null);
+    if (!missed.length) return pinned;
+    const latest = new Map((await this.metadataAt(missed, 'latest', null)).map((m) => [m.token, m]));
+    return pinned.map((m) => (m.supplyBlock == null ? latest.get(m.token) ?? m : m));
+  }
+
+  private async metadataAt(tokens: Address[], tag: string, block: bigint | null): Promise<TokenMetadata[]> {
+    const fns = ['name', 'symbol', 'decimals', 'totalSupply'] as const;
+    const calls = tokens.flatMap((t) =>
+      fns.map((fn) => ({
+        method: 'eth_call',
+        params: [{ to: t, data: encodeFunctionData({ abi: ABIS.erc20, functionName: fn }) }, tag],
+      })),
+    );
+    const results: (Hex | null)[] = [];
+    for (let i = 0; i < calls.length; i += 100) results.push(...(await this.batch<Hex>(calls.slice(i, i + 100))));
+    return tokens.map((token, ti) => {
+      const get = <F extends (typeof fns)[number]>(fn: F, fi: number) => {
+        const raw = results[ti * 4 + fi];
+        if (!raw || raw === '0x') return null;
+        try {
+          return decodeFunctionResult({ abi: ABIS.erc20, functionName: fn as 'name', data: raw }) as unknown;
+        } catch {
+          return null;
+        }
+      };
+      const supply = get('totalSupply', 3) as bigint | null;
+      return {
+        token,
+        name: (get('name', 0) as string | null) ?? '',
+        symbol: (get('symbol', 1) as string | null) ?? '',
+        decimals: Number(get('decimals', 2) ?? 18),
+        totalSupply: supply ?? 0n,
+        supplyBlock: supply == null ? null : block,
+      };
+    });
+  }
+
+  /** totalSupply() for many tokens at the current head, with that block (null: the call failed). */
+  async totalSupplies(tokens: Address[]): Promise<{ token: Address; totalSupply: bigint | null; supplyBlock: bigint }[]> {
+    if (!tokens.length) return [];
+    const head = await this.blockNumber();
+    const tag = `0x${head.toString(16)}`;
+    const data = encodeFunctionData({ abi: ABIS.erc20, functionName: 'totalSupply' });
+    const out: { token: Address; totalSupply: bigint | null; supplyBlock: bigint }[] = [];
+    for (let i = 0; i < tokens.length; i += 100) {
+      const chunk = tokens.slice(i, i + 100);
+      const res = await this.batch<Hex>(chunk.map((t) => ({ method: 'eth_call', params: [{ to: t, data }, tag] })));
+      chunk.forEach((token, k) => {
+        const raw = res[k];
+        out.push({ token, totalSupply: raw && raw !== '0x' && raw.length <= 66 ? BigInt(raw) : null, supplyBlock: head });
+      });
+    }
+    return out;
+  }
+
+  /** Who launched it: the smart-account sender for ERC-4337 txs, else tx.from. */
+  async launchers(txs: Hex[]): Promise<Map<Hex, Address>> {
+    const out = new Map<Hex, Address>();
+    const receipts = await this.batch<{ from: Address; logs: RawLog[] }>(
+      txs.map((h) => ({ method: 'eth_getTransactionReceipt', params: [h] })),
+    );
+    const USER_OP = '0x49628fd1471006c1482da88028e9ce4dbb080b815c9b0344d39e5a8e6ec1419f';
+    receipts.forEach((r, i) => {
+      if (!r) return;
+      const op = r.logs.find((l) => l.topics[0] === USER_OP);
+      const sender = op ? (`0x${op.topics[2]!.slice(26)}` as Address) : r.from;
+      out.set(txs[i]!, sender.toLowerCase() as Address);
+    });
+    return out;
+  }
+
+  /** v4 PoolKeys for pool ids, via the PositionManager (null when it never saw the pool). */
+  async poolKeys(ids: string[]) {
+    const abi = parseAbi([
+      'function poolKeys(bytes25 poolId) view returns (address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks)',
+    ]);
+    const raw = await this.batch<Hex>(
+      ids.map((id) => ({
+        method: 'eth_call',
+        params: [
+          { to: UNISWAP.v4.positionManager, data: encodeFunctionData({ abi, functionName: 'poolKeys', args: [id.slice(0, 52) as Hex] }) },
+          'latest',
+        ],
+      })),
+    );
+    return ids.map((id, i) => {
+      const r = raw[i];
+      if (!r || r === '0x') return { id, key: null };
+      const [currency0, currency1, fee, tickSpacing, hooks] = decodeFunctionResult({ abi, functionName: 'poolKeys', data: r });
+      if (currency0 === NATIVE_ETH && currency1 === NATIVE_ETH) return { id, key: null };
+      return {
+        id,
+        key: { currency0: currency0.toLowerCase() as Address, currency1: currency1.toLowerCase() as Address, hooks: hooks.toLowerCase() as Address, fee, tickSpacing },
+      };
+    });
+  }
+
+  /**
+   * token0/token1/factory of addresses that emitted v3/v2 Swap events (any fork). Null when the
+   * contract doesn't answer token0()/token1() (not a standard pair).
+   */
+  async pairKeys(addrs: string[]) {
+    const SEL = { token0: '0x0dfe1681', token1: '0xd21220a7', factory: '0xc45a0155', fee: '0xddca3f43', tickSpacing: '0xd0c93a7c' } as const;
+    const N = Object.keys(SEL).length;
+    const calls = addrs.flatMap((a) => Object.values(SEL).map((data) => ({ method: 'eth_call', params: [{ to: a, data }, 'latest'] })));
+    const res: (Hex | null)[] = [];
+    for (let i = 0; i < calls.length; i += 100) res.push(...(await this.batch<Hex>(calls.slice(i, i + 100))));
+    const addr = (r: Hex | null | undefined) => (r && r.length >= 66 ? (`0x${r.slice(26, 66)}`.toLowerCase() as Address) : null);
+    // uint24 fee / int24 tickSpacing (v2 pairs have neither).
+    const int = (r: Hex | null | undefined, signed: boolean) => {
+      if (!r || r.length < 66) return null;
+      const v = BigInt(`0x${r.slice(-6)}`);
+      return Number(signed && v >= 0x800000n ? v - 0x1000000n : v);
+    };
+    return addrs.map((id, i) => {
+      const [t0, t1, f] = [addr(res[i * N]), addr(res[i * N + 1]), addr(res[i * N + 2])];
+      const key = t0 && t1 && t0 !== t1 ? { currency0: t0, currency1: t1, factory: f, fee: int(res[i * N + 3], false), tickSpacing: int(res[i * N + 4], true) } : null;
+      return { id, key };
+    });
+  }
+
+  /** ERC-20 balances of many (token, holder) pairs in one batch; null where the call failed. */
+  async balances(pairs: { token: string; holder: string }[]): Promise<(bigint | null)[]> {
+    const calls = pairs.map((p) => ({
+      method: 'eth_call',
+      params: [{ to: p.token, data: `0x70a08231${p.holder.slice(2).toLowerCase().padStart(64, '0')}` }, 'latest'],
+    }));
+    const out: (bigint | null)[] = [];
+    for (let i = 0; i < calls.length; i += 100) {
+      for (const r of await this.batch<Hex>(calls.slice(i, i + 100))) out.push(r && r.length >= 66 ? BigInt(r.slice(0, 66)) : null);
+    }
+    return out;
+  }
+
+  /** v4 pool keys from their Initialize events (works for hook pools PositionManager never saw). */
+  async v4Initialized(ids: string[]): Promise<Map<string, { currency0: Address; currency1: Address; fee: number; tickSpacing: number; hooks: Address }>> {
+    const out = new Map<string, { currency0: Address; currency1: Address; fee: number; tickSpacing: number; hooks: Address }>();
+    const INIT = '0xdd466e674ea557f56295e2d0218a125ea4b4f0f6f3307b95f85e6110838d6438' as Hex;
+    const head = await this.blockNumber();
+    for (let i = 0; i < ids.length; i += 100) {
+      // Few logs per call, so the whole chain fits one request (Alchemy: any range up to 10K logs).
+      const logs = await this.filteredLogs(0n, head, { address: UNISWAP.v4.poolManager, topics: [INIT, ids.slice(i, i + 100) as Hex[]] });
+      for (const l of logs) {
+        const w = (k: number) => l.data.slice(2 + k * 64, 2 + (k + 1) * 64);
+        const ts = BigInt(`0x${w(1)}`);
+        out.set(l.topics[1]!.toLowerCase(), {
+          currency0: `0x${l.topics[2]!.slice(26)}`.toLowerCase() as Address,
+          currency1: `0x${l.topics[3]!.slice(26)}`.toLowerCase() as Address,
+          fee: Number(BigInt(`0x${w(0)}`)),
+          tickSpacing: Number(ts >= 1n << 255n ? ts - (1n << 256n) : ts),
+          hooks: `0x${w(2).slice(24)}`.toLowerCase() as Address,
+        });
+      }
+    }
+    return out;
+  }
+
+  /** A token's creation: its first Transfer (mint) tx, block and time, plus who sent that tx and to what contract. */
+  async tokenOrigin(token: Address) {
+    const res = await this.call<{ transfers: { hash: Hex; blockNum: Hex; metadata?: { blockTimestamp?: string } }[] }>(
+      'alchemy_getAssetTransfers',
+      [{ contractAddresses: [token], category: ['erc20'], order: 'asc', maxCount: '0x1', fromBlock: '0x0', withMetadata: true }],
+    );
+    const t = res.transfers[0];
+    if (!t) return null;
+    const tx = await this.call<{ from: Address; to: Address | null }>('eth_getTransactionByHash', [t.hash]);
+    return {
+      tx: t.hash,
+      block: BigInt(t.blockNum),
+      time: t.metadata?.blockTimestamp ? Math.floor(Date.parse(t.metadata.blockTimestamp) / 1000) : 0,
+      to: (tx.to ?? NATIVE_ETH).toLowerCase() as Address,
+    };
+  }
+
+  /** OR-filtered getLogs over [from, to], halving the range whenever the provider says the response is too big. */
+  async logsSplit(from: bigint, to: bigint, topics: Hex[]): Promise<RawLog[]> {
+    try {
+      return await this.logs(from, to, topics);
+    } catch (err) {
+      if (to - from < 2n || !/response size|exceed|too many|limit/i.test(String(err))) throw err;
+      const mid = (from + to) / 2n;
+      return [...(await this.logsSplit(from, mid, topics)), ...(await this.logsSplit(mid + 1n, to, topics))];
+    }
+  }
+
+  /**
+   * USD price of tokens from their own Uniswap v4 pools: quotes selling one token into USDG and into
+   * ETH across the common fee tiers (no hooks) and keeps the best answer. Null when no pool exists.
+   * Used for quote tokens other than ETH/USDG (Robinhood stock tokens, other coins used as quotes).
+   */
+  async usdPrices(tokens: { address: Address; decimals: number }[], ethUsd: number | null): Promise<Map<Address, number | null>> {
+    const abi = parseAbi([
+      'function quoteExactInputSingle(((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) poolKey, bool zeroForOne, uint128 exactAmount, bytes hookData) params) returns (uint256 amountOut, uint256 gasEstimate)',
+    ]);
+    const TIERS: [number, number][] = [[100, 1], [500, 10], [3000, 60], [10000, 200], [0x800000, 60]];
+    const COUNTER: { address: Address; decimals: number; usd: () => number | null }[] = [
+      { address: QUOTES.USDG as Address, decimals: 6, usd: () => 1 },
+      { address: NATIVE_ETH as Address, decimals: 18, usd: () => ethUsd },
+    ];
+    const calls: { token: Address; counter: (typeof COUNTER)[number]; decimals: number }[] = [];
+    const reqs = tokens.flatMap((t) =>
+      COUNTER.flatMap((c) =>
+        TIERS.map(([fee, tickSpacing]) => {
+          const tokenIs0 = t.address.toLowerCase() < c.address.toLowerCase();
+          calls.push({ token: t.address, counter: c, decimals: t.decimals });
+          const data = encodeFunctionData({
+            abi,
+            functionName: 'quoteExactInputSingle',
+            args: [
+              {
+                poolKey: {
+                  currency0: tokenIs0 ? t.address : c.address,
+                  currency1: tokenIs0 ? c.address : t.address,
+                  fee,
+                  tickSpacing,
+                  hooks: NATIVE_ETH as Address,
+                },
+                zeroForOne: tokenIs0,
+                exactAmount: 10n ** BigInt(t.decimals),
+                hookData: '0x',
+              },
+            ],
+          });
+          return { method: 'eth_call', params: [{ to: UNISWAP.v4.quoter, data }, 'latest'] };
+        }),
+      ),
+    );
+    const out = new Map<Address, number | null>(tokens.map((t) => [t.address, null]));
+    for (let i = 0; i < reqs.length; i += 100) {
+      const res = await this.batch<Hex>(reqs.slice(i, i + 100));
+      res.forEach((r, j) => {
+        if (!r || r === '0x') return;
+        const c = calls[i + j]!;
+        const perUnit = c.counter.usd();
+        if (perUnit == null) return;
+        try {
+          const [amountOut] = decodeFunctionResult({ abi, functionName: 'quoteExactInputSingle', data: r });
+          const usd = (Number(amountOut) / 10 ** c.counter.decimals) * perUnit;
+          if (usd > 0 && usd > (out.get(c.token) ?? 0)) out.set(c.token, usd);
+        } catch {
+          // no pool at this tier
+        }
+      });
+    }
+    return out;
+  }
+
+  /** PONS curves' quote tokens via `pairToken()` (0x0 = native ETH; USDG for dollar curves). */
+  async curveQuotes(curves: string[]): Promise<Map<string, Address>> {
+    const SELECTOR = toFunctionSelector('pairToken()');
+    const res = await this.batch<Hex>(curves.map((c) => ({ method: 'eth_call', params: [{ to: c, data: SELECTOR }, 'latest'] })));
+    const out = new Map<string, Address>();
+    curves.forEach((c, i) => {
+      const r = res[i];
+      out.set(c, (r && r.length >= 66 ? `0x${r.slice(26, 66)}` : NATIVE_ETH).toLowerCase() as Address);
+    });
+    return out;
+  }
+
+  /** All Transfer logs of one token in [from, to]. Tries the whole range, halving whenever the response is too big. */
+  /**
+   * A token's Transfer history. With a budget, gives up (HistoryTooLarge) past `maxLogs` logs or
+   * `maxMs`, so a token with an enormous history can't stall the live indexer.
+   */
+  async transferLogs(token: Address, from: bigint, to: bigint, budget?: { maxLogs: number; maxMs: number }): Promise<RawLog[]> {
+    const TRANSFER = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+    const b = budget ? { left: budget.maxLogs, deadline: Date.now() + budget.maxMs } : undefined;
+    return this.filteredLogs(from, to, { address: token, topics: [TRANSFER] }, b);
+  }
+
+  /**
+   * getLogs with an address and/or per-position topic filter (e.g. Swap events for a list of pool
+   * ids), halving the block range whenever the provider says the response is too big.
+   */
+  async filteredLogs(
+    from: bigint,
+    to: bigint,
+    filter: { address?: string | string[]; topics: (Hex | Hex[] | null)[] },
+    budget?: { left: number; deadline: number },
+  ): Promise<RawLog[]> {
+    if (budget && (budget.left < 0 || Date.now() > budget.deadline)) throw new HistoryTooLarge();
+    try {
+      // With a budget, a single call may not outlive it (a hung call would hold one of the 6 connections).
+      const timeout = budget ? Math.max(1_000, Math.min(30_000, budget.deadline - Date.now())) : 30_000;
+      const logs = await this.call<RawLog[]>('eth_getLogs', [
+        { fromBlock: `0x${from.toString(16)}`, toBlock: `0x${to.toString(16)}`, ...filter },
+      ], timeout).catch((err) => {
+        if (budget && err instanceof Error && err.name === 'TimeoutError') throw new HistoryTooLarge();
+        throw err;
+      });
+      if (budget && (budget.left -= logs.length) < 0) throw new HistoryTooLarge();
+      return logs;
+    } catch (err) {
+      if (err instanceof HistoryTooLarge) throw err;
+      if (to - from < 2n || !/response size|exceed|too many|limit|range/i.test(String(err))) throw err;
+      const mid = (from + to) / 2n;
+      return [...(await this.filteredLogs(from, mid, filter, budget)), ...(await this.filteredLogs(mid + 1n, to, filter, budget))];
+    }
+  }
+
+  /**
+   * First incoming ETH transfer per wallet (≈ who created/funded it, and when), via Alchemy's
+   * transfers API. Wallets with no incoming ETH (e.g. contracts) come back with nulls.
+   */
+  async firstFunders(wallets: Address[]): Promise<Map<Address, { funder: Address | null; at: number | null }>> {
+    const out = new Map<Address, { funder: Address | null; at: number | null }>();
+    for (let i = 0; i < wallets.length; i += 25) {
+      const chunk = wallets.slice(i, i + 25);
+      const results = await this.batch<{ transfers: { from: string; metadata?: { blockTimestamp?: string } }[] }>(
+        chunk.map((w) => ({
+          method: 'alchemy_getAssetTransfers',
+          params: [
+            {
+              toAddress: w,
+              category: ['external', 'internal'],
+              order: 'asc',
+              maxCount: '0x1',
+              excludeZeroValue: true,
+              withMetadata: true,
+              fromBlock: '0x0',
+            },
+          ],
+        })),
+      );
+      chunk.forEach((w, j) => {
+        const t = results[j]?.transfers?.[0];
+        out.set(w, {
+          funder: t ? (t.from.toLowerCase() as Address) : null,
+          at: t?.metadata?.blockTimestamp ? Math.floor(Date.parse(t.metadata.blockTimestamp) / 1000) : null,
+        });
+      });
+    }
+    return out;
+  }
+
+  /**
+   * Alchemy's free tier caps eth_getLogs at a 10-block range, so log queries go to the public
+   * Robinhood Chain RPC (30k-block range); everything else, and the live WebSocket, stays on RPC_URL.
+   */
+  private target(body: unknown): string {
+    const isLogs = !Array.isArray(body) && (body as { method?: string })?.method === 'eth_getLogs';
+    return isLogs && /alchemy.com/.test(this.url) ? PUBLIC_LOGS_RPC : this.url;
+  }
+
+  private async post(body: unknown, timeoutMs = 30_000): Promise<Response> {
+    const url = this.target(body);
+    for (let attempt = 0; ; attempt++) {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      if (res.ok) return res;
+      // Read the body either way: an unread one keeps its connection open (Workers allow 6).
+      const text = await res.text();
+      if (attempt >= 5 || (res.status !== 429 && res.status < 500)) {
+        throw new Error(`RPC HTTP ${res.status}: ${text.slice(0, 200)}`);
+      }
+      await new Promise((r) => setTimeout(r, 250 * 2 ** attempt));
+    }
+  }
+}
+
+export class HistoryTooLarge extends Error {
+  override name = 'HistoryTooLarge';
+}

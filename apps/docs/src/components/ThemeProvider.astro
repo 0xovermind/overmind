@@ -1,0 +1,7 @@
+{/* Overmind override: light paper is the default, like overmind.ink. Dark (the terminal palette) stays one click away. Inlined to avoid a flash. */}
+<script is:inline>
+	(() => {
+		const stored = typeof localStorage !== 'undefined' && localStorage.getItem('starlight-theme');
+		document.documentElement.dataset.theme = stored === 'dark' ? 'dark' : 'light';
+	})();
+</script>
