@@ -125,7 +125,7 @@ const STEPS = [
   {
     n: '01',
     title: 'Smart wallets',
-    body: 'We rank every wallet on Robinhood Chain by realized profit and keep the top 300. Bots with thousands of trades are left out. When one of them net-buys a token, that is a vote in.',
+    body: 'We rank every wallet on Robinhood Chain by realized profit and keep the top 300. Bots, spray snipers and launch insiders are left out. When one of them net-buys a token, that is a vote in.',
   },
   {
     n: '02',
