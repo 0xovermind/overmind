@@ -38,8 +38,11 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const hex = (n: number) => "0x" + n.toString(16);
 const addr = (topic: string) => "0x" + topic.slice(26).toLowerCase();
 
+/** Log scans go to the public RPC (Alchemy's free tier caps getLogs at 10 blocks); every other call to RPC_URL when set. */
+const FAST = process.env.RPC_URL || RPC;
+const isLogs = (b: unknown) => !Array.isArray(b) && (b as { method?: string })?.method === "eth_getLogs";
 async function post<T>(body: unknown, tries = 4): Promise<T> {
-  const r = await fetch(RPC, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), cache: "no-store", signal: AbortSignal.timeout(20000) });
+  const r = await fetch(isLogs(body) ? RPC : FAST, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), cache: "no-store", signal: AbortSignal.timeout(20000) });
   const t = await r.text();
   const j = t.startsWith("{") || t.startsWith("[") ? JSON.parse(t) : null;
   if ((!j || (!Array.isArray(j) && (j.error?.code === 429 || /too many requests|rate/i.test(j.error?.message || "")))) && tries > 0) {

@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { ThemeToggle } from './theme-toggle';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { MagnifyingGlass } from '@phosphor-icons/react';
@@ -18,7 +19,7 @@ const NAV = [
   { href: '/leaderboard', label: 'Ranks' },
 ];
 
-export function TopBar() {
+export function TopBar({ theme = 'dark' }: { theme?: 'dark' | 'light' }) {
   const path = usePathname();
   return (
     <header className="sticky top-0 z-40 flex h-14 items-center gap-6 border-b border-ink/[0.06] bg-bg/90 px-4 backdrop-blur-md">
@@ -41,6 +42,7 @@ export function TopBar() {
       </nav>
       <Search />
       <div className="ml-auto flex items-center gap-2">
+        <ThemeToggle initial={theme} />
         <FeedbackButton />
         <AccountMenu />
       </div>

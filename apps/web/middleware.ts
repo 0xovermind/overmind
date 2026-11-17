@@ -36,10 +36,41 @@ function redirect(req: NextRequest, host: string, pathname = req.nextUrl.pathnam
  * 3. Strict CSP with a per-request nonce on the terminal pages. Next.js reads the nonce from the request's
  *    CSP header and puts it on its own scripts; these routes render dynamically.
  */
+/**
+ * Launch gate: until NEXT_PUBLIC_LAUNCH_AT every page shows the countdown at /soon. API routes, the agent
+ * files and static assets stay open. LAUNCH_PREVIEW_KEY lets the team in: open any page with ?preview=<key>
+ * once and a cookie keeps the site open in that browser.
+ */
+const LAUNCH_AT = Date.parse(process.env.NEXT_PUBLIC_LAUNCH_AT ?? '');
+const GATE_OPEN = /^\/(soon|api\/|skill\.md|llms\.txt|robots\.txt)/;
+
+function gate(req: NextRequest, path: string): NextResponse | null {
+  if (!Number.isFinite(LAUNCH_AT) || Date.now() >= LAUNCH_AT || GATE_OPEN.test(path)) return null;
+  const key = process.env.LAUNCH_PREVIEW_KEY;
+  if (key) {
+    if (req.cookies.get('om-preview')?.value === key) return null;
+    if (req.nextUrl.searchParams.get('preview') === key) {
+      const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? 'overmind.ink';
+      const res = NextResponse.redirect(`${LOCAL.test(host) ? 'http' : 'https'}://${host}${path}`, 307);
+      res.cookies.set('om-preview', key, { httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 7 });
+      return res;
+    }
+  }
+  // A redirect, not a rewrite: behind the proxy a rewrite becomes an https request from Next to itself.
+  // Built from the Host header: the server itself only knows its internal address (localhost:3000).
+  const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? 'overmind.ink';
+  const proto = LOCAL.test(host) ? 'http' : 'https';
+  const res = NextResponse.redirect(`${proto}://${host}/soon`, 307);
+  res.headers.set('cache-control', 'no-store');
+  return res;
+}
+
 export function middleware(req: NextRequest) {
   const host = (req.headers.get('host') ?? req.nextUrl.host).toLowerCase();
   const local = LOCAL.test(host);
   const path = req.nextUrl.pathname;
+  const gated = gate(req, path);
+  if (gated) return gated;
   if (!local && !SPLIT_HOSTS) {
     if (host === `www.${SITE_HOST}`) return redirect(req, SITE_HOST);
     if (isHttp(req)) return redirect(req, host);

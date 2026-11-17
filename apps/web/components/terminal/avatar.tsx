@@ -9,7 +9,7 @@ import { useId } from 'react';
 
 /** [light, dark] stops, all from the terminal palette. */
 const GRADIENTS: [string, string][] = [
-  ['#2f7a3e', '#0b3a10'],
+  ['#3ddc97', '#0b3a10'],
   ['#a6ff4d', '#1d5a14'],
   ['#5ec8ff', '#0f3550'],
   ['#ffb547', '#55300a'],

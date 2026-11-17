@@ -49,7 +49,7 @@ export function BubbleMap({ data }: { data: BubbleData }) {
   const active = focus ?? (hover && hover.cluster >= 0 ? hover.cluster : null);
   const dim = (n: Node) => active != null && n.cluster !== active;
   const color = (n: Node) =>
-    n.cluster >= 0 ? CLUSTER_COLORS[n.cluster % CLUSTER_COLORS.length]! : n.tags.includes('dev') ? '#ffffff' : '#2f7a3e';
+    n.cluster >= 0 ? CLUSTER_COLORS[n.cluster % CLUSTER_COLORS.length]! : n.tags.includes('dev') ? '#ffffff' : '#3ddc97';
 
   return (
     <div className="grid gap-4 p-4 lg:grid-cols-[1fr_240px]">
@@ -62,7 +62,7 @@ export function BubbleMap({ data }: { data: BubbleData }) {
               y1={l.source.y}
               x2={l.target.x}
               y2={l.target.y}
-              stroke={l.kind === 'transfer' ? 'rgba(94,200,255,0.4)' : 'rgba(29,29,29,0.18)'}
+              stroke={l.kind === 'transfer' ? 'rgba(94,200,255,0.4)' : 'rgba(255,255,255,0.18)'}
               strokeDasharray={l.kind === 'transfer' ? '3 3' : undefined}
               opacity={active != null && (l.source.cluster !== active || l.target.cluster !== active) ? 0.15 : 1}
             />

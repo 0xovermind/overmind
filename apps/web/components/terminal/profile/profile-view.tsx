@@ -309,12 +309,12 @@ function Portfolio({ total, summary, loading }: { total: number | null; summary:
         <svg viewBox="0 0 300 100" preserveAspectRatio="none" className="absolute inset-0 size-full" aria-hidden>
           <defs>
             <linearGradient id="pnl-fill" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0" stopColor={up ? '#2f7a3e' : '#ff6b5b'} stopOpacity="0.18" />
-              <stop offset="1" stopColor={up ? '#2f7a3e' : '#ff6b5b'} stopOpacity="0" />
+              <stop offset="0" stopColor={up ? '#3ddc97' : '#ff6b5b'} stopOpacity="0.18" />
+              <stop offset="1" stopColor={up ? '#3ddc97' : '#ff6b5b'} stopOpacity="0" />
             </linearGradient>
           </defs>
           <path d="M0 60 L300 60 L300 100 L0 100 Z" fill="url(#pnl-fill)" />
-          <path d="M0 60 L300 60" stroke={up ? '#2f7a3e' : '#ff6b5b'} strokeOpacity="0.5" strokeWidth="1.5" fill="none" strokeDasharray="4 4" />
+          <path d="M0 60 L300 60" stroke={up ? '#3ddc97' : '#ff6b5b'} strokeOpacity="0.5" strokeWidth="1.5" fill="none" strokeDasharray="4 4" />
         </svg>
         <span className="absolute bottom-2 right-3 text-[10px] text-muted">PnL history chart coming soon</span>
       </div>

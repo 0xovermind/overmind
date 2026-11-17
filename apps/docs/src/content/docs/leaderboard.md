@@ -29,7 +29,9 @@ Volume is shown but never ranked.
 
 A swap reaches the board once Overmind's indexer sees it, usually within a minute. The board is cached for 30 seconds.
 
-## Season rewards
+## Seasons
+
+A season is a ranking window: the board starts from zero, and when it ends the final standings are frozen and kept. There are no prizes. The point is the public, on-chain record of who called it right.
 
 
 ## For agents

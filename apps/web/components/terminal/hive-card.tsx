@@ -1,6 +1,24 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
+/** Count from the last shown value to the new one (score animation). */
+function useCount(target: number) {
+  const [v, setV] = useState(0);
+  const from = useRef(0);
+  useEffect(() => {
+    const a = from.current, t0 = performance.now();
+    let raf = 0;
+    const step = (t: number) => {
+      const k = Math.min(1, (t - t0) / 900), e = 1 - Math.pow(1 - k, 3);
+      setV(Math.round(a + (target - a) * e));
+      if (k < 1) raf = requestAnimationFrame(step); else from.current = target;
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [target]);
+  return v;
+}
 import { API_URL } from '@/lib/api';
 
 interface Consensus {
@@ -30,18 +48,19 @@ export function HiveCard({ token }: { token: string }) {
   }, [token]);
 
   const score = c?.score ?? 0;
+  const shown = useCount(score);
   const w = Math.min(50, Math.abs(score) / 2);
   return (
-    <section className="rounded-xl border border-ink/[0.06] bg-surface p-4">
+    <section className={`hive-live rounded-xl border border-ink/[0.06] bg-surface p-4 ${score >= 20 ? 'is-up' : score <= -20 ? 'is-down' : ''}`}>
       <div className="flex items-center justify-between">
         <h3 className="text-[11px] font-medium uppercase tracking-[0.06em] text-muted">Hive consensus</h3>
-        <span className="font-mono text-lg">{c ? (score > 0 ? `+${score}` : score) : '—'}</span>
+        <span className="font-mono text-2xl">{c ? (shown > 0 ? `+${shown}` : shown) : '—'}</span>
       </div>
       <div className="relative mt-3 h-1.5 w-full bg-ink/[0.06]">
         <span className="absolute inset-y-0 left-1/2 w-px bg-ink/20" />
         {c && (
           <span
-            className="absolute inset-y-0 bg-ink transition-all duration-700"
+            className={`hive-bar absolute inset-y-0 transition-all duration-700 ${score >= 0 ? 'up' : 'down'}`}
             style={score >= 0 ? { left: '50%', width: `${w}%` } : { right: '50%', width: `${w}%` }}
           />
         )}

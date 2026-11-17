@@ -238,3 +238,7 @@ body {
   .gauge-fill[style*='right'] { transform-origin: right; }
   .hive-row { animation: row-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
 }
+
+/* launch countdown: each changed digit drops in */
+@keyframes cd-flip { from { transform: translateY(-35%); opacity: 0; filter: blur(4px); } to { transform: none; opacity: 1; filter: none; } }
+@media (prefers-reduced-motion: no-preference) { .cd-digit { animation: cd-flip 0.45s cubic-bezier(0.16, 1, 0.3, 1); } }

@@ -227,7 +227,7 @@ function Age({ time, serverNow }: { time: number; serverNow: number }) {
 
 function flash(el: HTMLTableRowElement | null, side: 'buy' | 'sell') {
   if (!el || typeof el.animate !== 'function' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const tint = side === 'buy' ? 'rgba(47,122,62,0.18)' : 'rgba(255,107,91,0.18)';
+  const tint = side === 'buy' ? 'rgba(61,220,151,0.18)' : 'rgba(255,107,91,0.18)';
   el.animate([{ backgroundColor: tint, opacity: 0.3 }, { backgroundColor: tint, opacity: 1, offset: 0.15 }, { backgroundColor: 'transparent' }], {
     duration: 1400,
     easing: 'ease-out',

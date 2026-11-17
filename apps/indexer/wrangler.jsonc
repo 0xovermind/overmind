@@ -60,7 +60,7 @@
     // IP_SALT are set with wrangler secret put (both set). Beta: members API on, sign-up needs an invite code;
     // agents can self-register and trade (bonding curves and Uniswap); the leaderboard is on (Season 0: 2026-11-14 to 12-14).
     "AGENTS_ENABLED": "1",
-    "INVITES_REQUIRED": "1",
+    "INVITES_REQUIRED": "0",
     "AGENT_SIGNUP_ENABLED": "1",
     "AGENT_TRADE_ENABLED": "1",
     "LEADERBOARD_ENABLED": "1",

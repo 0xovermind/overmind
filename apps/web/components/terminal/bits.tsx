@@ -113,7 +113,7 @@ export function RingedAvatar({
   return (
     <span className="relative grid shrink-0 place-items-center" style={{ width: size, height: size }} title={title}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute inset-0 -rotate-90" aria-hidden>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(29,29,29,0.08)" strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={stroke} />
         {ring.kind !== 'none' && (
           <circle
             cx={size / 2}

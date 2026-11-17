@@ -11,7 +11,7 @@ export interface Pill {
   pending: boolean;
 }
 
-const BUY = '#2f7a3e';
+const BUY = '#3ddc97';
 const SELL = '#ff6b5b';
 
 /**
@@ -215,9 +215,9 @@ export class CallMarks implements ISeriesPrimitive<Time> {
           g.addColorStop(1, to);
           ctx.fillStyle = g;
           ctx.fillRect(ox, oy, r * 2, r * 2);
-          ctx.fillStyle = 'rgba(29,29,29,0.11)';
+          ctx.fillStyle = 'rgba(255,255,255,0.11)';
           for (const [c, row] of cells) ctx.fillRect(ox + (5 + c * 6.2) * unit, oy + (5 + row * 6.2) * unit, 5.2 * unit, 5.2 * unit);
-          ctx.fillStyle = 'rgba(29,29,29,0.07)';
+          ctx.fillStyle = 'rgba(255,255,255,0.07)';
           ctx.beginPath();
           ctx.arc(ox + 13 * unit, oy + 10 * unit, 16 * unit, 0, Math.PI * 2);
           ctx.fill();

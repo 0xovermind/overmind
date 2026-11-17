@@ -5,22 +5,42 @@
  * Set on :root while the terminal is mounted, so dialogs and sheets portalled to <body> match too.
  */
 :root:has(.terminal-ui) {
-  --color-bg: #e5e4e0;
-  --color-surface: #ffffff;
-  --color-surface-2: #efeee9;
-  --color-line: #cfcec9;
-  --color-ink: #1d1d1d;
-  --color-muted: #6b6a66;
-  --color-brand: #1d1d1d;
-  --color-brand-deep: #1d1d1d;
-  --color-lime: #1d1d1d;
-  --color-go: #1d1d1d;
-  --color-risk-high: #c8402f;
-  --color-risk-medium: #a8700e;
-  --color-risk-low: #2f7a3e;
-  color-scheme: light;
+  --color-bg: #07070a;
+  --color-surface: #111116;
+  --color-surface-2: #17171d;
+  --color-line: #24242c;
+  --color-ink: #ececf1;
+  --color-muted: #8b8b96;
+  --color-brand: #ececf1;
+  --color-brand-deep: #c9c9d2;
+  --color-lime: #ececf1;
+  --color-go: #ececf1;
+  --color-risk-high: #ff5d6c;
+  --color-risk-medium: #ffb547;
+  --color-risk-low: #3ddc97;
+  color-scheme: dark;
 }
-:root:has(.terminal-ui) body { background: #e5e4e0; }
+:root:has(.terminal-ui) body { background: #07070a; }
+
+/*
+ * Glass: panels let the iridescent haze behind them show through, with a hairline top light.
+ */
+.terminal-ui .rounded-2xl.bg-surface,
+.terminal-ui .rounded-xl.bg-surface,
+.terminal-ui section.bg-surface {
+  background: rgb(255 255 255 / 0.035);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 20px 50px -30px rgb(0 0 0 / 0.8);
+}
+.terminal-ui header.sticky { background: rgb(7 7 10 / 0.6); }
+
+/* Primary actions wear the hive gradient. */
+.terminal-ui .bg-go,
+.terminal-ui .bg-ink.text-bg {
+  background-image: linear-gradient(100deg, rgb(250, 203, 14), rgb(240, 107, 168) 45%, rgb(120, 186, 230));
+  color: #0b0b0f;
+}
 
 /*
  * Thin, quiet scrollbars for every scroll area in the terminal: a rounded thumb (white at 15%,
@@ -31,11 +51,11 @@
   .terminal-ui,
   .terminal-ui * {
     scrollbar-width: thin;
-    scrollbar-color: rgb(29 29 29 / 0.15) transparent;
+    scrollbar-color: rgb(255 255 255 / 0.15) transparent;
   }
 
   .terminal-ui *:hover {
-    scrollbar-color: rgb(29 29 29 / 0.28) transparent;
+    scrollbar-color: rgb(255 255 255 / 0.28) transparent;
   }
 
   /* Browsers without the standard properties (older Safari) use the WebKit pseudo-elements. */
@@ -48,11 +68,11 @@
       background: transparent;
     }
     .terminal-ui ::-webkit-scrollbar-thumb {
-      background: rgb(29 29 29 / 0.15);
+      background: rgb(255 255 255 / 0.15);
       border-radius: 999px;
     }
     .terminal-ui ::-webkit-scrollbar-thumb:hover {
-      background: rgb(29 29 29 / 0.3);
+      background: rgb(255 255 255 / 0.3);
     }
   }
 }
@@ -60,7 +80,7 @@
 /* Trenches row update: a soft gray lift that fades out (instead of a green tint). */
 @keyframes trench-flash {
   from {
-    background: rgb(29 29 29 / 0.07);
+    background: rgb(255 255 255 / 0.07);
   }
   to {
     background: transparent;
@@ -75,21 +95,22 @@
 /* A slow iridescent haze behind the panels: the hive sphere, out of focus. */
 .aurora {
   background:
-    radial-gradient(40% 50% at 85% 0%, rgb(240 107 168 / 0.16), transparent 70%),
-    radial-gradient(35% 45% at 100% 30%, rgb(120 186 230 / 0.18), transparent 70%),
-    radial-gradient(30% 40% at 70% 10%, rgb(250 203 14 / 0.12), transparent 70%);
+    radial-gradient(45% 55% at 88% -5%, rgb(240 107 168 / 0.22), transparent 70%),
+    radial-gradient(40% 50% at 100% 35%, rgb(120 186 230 / 0.20), transparent 70%),
+    radial-gradient(35% 45% at 65% 5%, rgb(250 203 14 / 0.12), transparent 70%),
+    radial-gradient(40% 50% at 0% 100%, rgb(120 186 230 / 0.10), transparent 70%);
 }
 
 /* The hive score chip on trench cards and token pages. */
 .hive-chip {
   display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px;
   font-family: var(--font-mono); font-size: 11px; line-height: 18px; white-space: nowrap;
-  border: 1px solid rgb(29 29 29 / 0.12); background: #fff;
+  border: 1px solid rgb(255 255 255 / 0.12); background: rgb(255 255 255 / 0.04);
 }
 .hive-chip i { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
   background: linear-gradient(255deg, rgb(250,203,14), rgb(240,107,168) 30%, rgb(120,186,230) 65%, #fff); }
-.hive-chip.up { color: #2f7a3e; border-color: rgb(47 122 62 / 0.35); }
-.hive-chip.down { color: #c8402f; border-color: rgb(200 64 47 / 0.35); }
+.hive-chip.up { color: #3ddc97; border-color: rgb(61 220 151 / 0.35); }
+.hive-chip.down { color: #ff5d6c; border-color: rgb(255 93 108 / 0.35); }
 
 /* Live dot: a ring that keeps expanding out of it. */
 .live-dot::after {
@@ -97,7 +118,7 @@
 }
 
 .radar > span {
-  position: absolute; inset: 0; border-radius: 50%; border: 1px solid rgb(29 29 29 / 0.35);
+  position: absolute; inset: 0; border-radius: 50%; border: 1px solid rgb(255 255 255 / 0.35);
 }
 
 .trench-row > .group { transition: background-color 0.2s, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
@@ -146,3 +167,87 @@
   .pulse-fill { animation: grow-x 1s cubic-bezier(0.16, 1, 0.3, 1) both; }
   .hive-orb { animation: orb-spin 6s linear infinite; }
 }
+
+/* ---------------------------------------------------------------- more motion (dark glass) */
+
+/* Pointer light on glass panels (Spotlight sets --mx/--my). */
+.terminal-ui .spot-on {
+  background-image: radial-gradient(420px circle at var(--mx) var(--my), rgb(255 255 255 / 0.07), transparent 45%);
+}
+
+/* The hive gradient on primary buttons drifts, and a shine sweeps across on hover. */
+.terminal-ui .bg-go,
+.terminal-ui .bg-ink.text-bg { background-size: 220% 100%; position: relative; overflow: hidden; }
+.terminal-ui .bg-go::after,
+.terminal-ui .bg-ink.text-bg::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(110deg, transparent 30%, rgb(255 255 255 / 0.55) 50%, transparent 70%);
+  transform: translateX(-120%);
+}
+.terminal-ui .bg-go:hover::after,
+.terminal-ui .bg-ink.text-bg:hover::after { transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1); transform: translateX(120%); }
+
+/* Hive consensus: coloured bar with a glow, a breathing rim when the hive leans hard. */
+.hive-bar.up { background: linear-gradient(90deg, rgb(61 220 151 / 0.5), #3ddc97); box-shadow: 0 0 14px rgb(61 220 151 / 0.6); }
+.hive-bar.down { background: linear-gradient(270deg, rgb(255 93 108 / 0.5), #ff5d6c); box-shadow: 0 0 14px rgb(255 93 108 / 0.6); }
+.hive-live.is-up { border-color: rgb(61 220 151 / 0.25); }
+.hive-live.is-down { border-color: rgb(255 93 108 / 0.25); }
+
+/* Token page rail: cards rise in one after another. */
+.rail-in > * { --d: 0s; }
+.rail-in > *:nth-child(2) { --d: 0.06s; } .rail-in > *:nth-child(3) { --d: 0.12s; }
+.rail-in > *:nth-child(4) { --d: 0.18s; } .rail-in > *:nth-child(5) { --d: 0.24s; } .rail-in > *:nth-child(6) { --d: 0.3s; }
+
+@keyframes grad-drift { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+@keyframes rim-up { 0%, 100% { box-shadow: 0 0 0 0 rgb(61 220 151 / 0); } 50% { box-shadow: 0 0 28px -4px rgb(61 220 151 / 0.35); } }
+@keyframes rim-down { 0%, 100% { box-shadow: 0 0 0 0 rgb(255 93 108 / 0); } 50% { box-shadow: 0 0 28px -4px rgb(255 93 108 / 0.35); } }
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes hue { to { filter: hue-rotate(360deg); } }
+
+@media (prefers-reduced-motion: no-preference) {
+  .terminal-ui .bg-go, .terminal-ui .bg-ink.text-bg { animation: grad-drift 6s ease-in-out infinite; }
+  .hive-live.is-up { animation: rim-up 3s ease-in-out infinite; }
+  .hive-live.is-down { animation: rim-down 3s ease-in-out infinite; }
+  .rail-in > * { animation: rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: var(--d); }
+  .aurora { animation: aurora 18s ease-in-out infinite, hue 40s linear infinite; }
+  .hive-orb { animation: orb-spin 6s linear infinite; }
+}
+
+/* ---------------------------------------------------------------- light theme (toggle in the top bar) */
+:root:has(.terminal-ui[data-theme='light']) {
+  --color-bg: #ecebe7;
+  --color-surface: #ffffff;
+  --color-surface-2: #f3f2ee;
+  --color-line: #d8d7d2;
+  --color-ink: #17171a;
+  --color-muted: #6b6a70;
+  --color-brand: #17171a;
+  --color-brand-deep: #17171a;
+  --color-lime: #17171a;
+  --color-go: #17171a;
+  --color-risk-high: #d63f4f;
+  --color-risk-medium: #b07408;
+  --color-risk-low: #16935f;
+  color-scheme: light;
+}
+:root:has(.terminal-ui[data-theme='light']) body { background: #ecebe7; }
+.terminal-ui[data-theme='light'] .rounded-2xl.bg-surface,
+.terminal-ui[data-theme='light'] .rounded-xl.bg-surface,
+.terminal-ui[data-theme='light'] section.bg-surface {
+  background-color: rgb(255 255 255 / 0.72);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.9), 0 18px 40px -28px rgb(20 20 30 / 0.35);
+}
+.terminal-ui[data-theme='light'] header.sticky { background: rgb(236 235 231 / 0.7); }
+.terminal-ui[data-theme='light'] .spot-on {
+  background-image: radial-gradient(420px circle at var(--mx) var(--my), rgb(240 107 168 / 0.08), transparent 45%);
+}
+.terminal-ui[data-theme='light'] .aurora { opacity: 0.8; }
+.terminal-ui[data-theme='light'] .hive-chip.up, .terminal-ui[data-theme='light'] .hive-bar.up + * { color: #16935f; }
+.terminal-ui[data-theme='light'] .hive-chip.down { color: #d63f4f; }
+.terminal-ui[data-theme='light'] .hive-bar.up { background: linear-gradient(90deg, rgb(22 147 95 / 0.5), #16935f); box-shadow: none; }
+.terminal-ui[data-theme='light'] .hive-bar.down { background: linear-gradient(270deg, rgb(214 63 79 / 0.5), #d63f4f); box-shadow: none; }
+
+/* Theme switch: the icon spins in, and the whole terminal cross-fades its colours. */
+@keyframes theme-icon { from { transform: rotate(-90deg) scale(0.4); opacity: 0; } to { transform: none; opacity: 1; } }
+.terminal-ui, .terminal-ui .bg-surface, .terminal-ui header { transition: background-color 0.35s ease, color 0.35s ease, border-color 0.35s ease; }
+@media (prefers-reduced-motion: no-preference) { .theme-icon { display: grid; animation: theme-icon 0.45s cubic-bezier(0.16, 1, 0.3, 1); } }

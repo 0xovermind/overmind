@@ -38,7 +38,7 @@ const HOURS: Partial<Record<Interval, number>> = { '1m': 24, '5m': 72, '15m': 16
 const BAR_SPACING = 7;
 const RIGHT_OFFSET = 6;
 
-const UP = '#2f7a3e';
+const UP = '#3ddc97';
 const DOWN = '#ff6b5b';
 
 interface Bar {
@@ -139,13 +139,13 @@ export function PriceChart({
     if (!box.current) return;
     const c = createChart(box.current, {
       autoSize: true,
-      layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: '#6b6a66', fontFamily: 'var(--font-geist-mono)', fontSize: 11, attributionLogo: false },
-      grid: { vertLines: { color: 'rgba(29,29,29,0.03)' }, horzLines: { color: 'rgba(29,29,29,0.04)' } },
+      layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: '#8b8b96', fontFamily: 'var(--font-geist-mono)', fontSize: 11, attributionLogo: false },
+      grid: { vertLines: { color: 'rgba(255,255,255,0.03)' }, horzLines: { color: 'rgba(255,255,255,0.04)' } },
       // Top margin keeps the highest candle clear of the OHLC legend; entireTextOnly drops a corner
       // label that would be cut by the pane edge; minimumWidth fits labels like "$136.0K".
       rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.18, bottom: 0.22 }, entireTextOnly: true, minimumWidth: 64 },
       timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false, rightOffset: RIGHT_OFFSET, barSpacing: BAR_SPACING },
-      crosshair: { horzLine: { color: 'rgba(29,29,29,0.2)' }, vertLine: { color: 'rgba(29,29,29,0.2)' } },
+      crosshair: { horzLine: { color: 'rgba(255,255,255,0.2)' }, vertLine: { color: 'rgba(255,255,255,0.2)' } },
       localization: { priceFormatter: (p: number) => usdPrecise(p) },
     });
     candles.current = c.addSeries(CandlestickSeries, {
@@ -340,7 +340,7 @@ export function PriceChart({
     if (!series || avgBuy == null || !(avgBuy > 0)) return;
     const line = series.createPriceLine({
       price: avgBuy * scale,
-      color: '#2f7a3e',
+      color: '#3ddc97',
       lineWidth: 1,
       lineStyle: LineStyle.Dashed,
       axisLabelVisible: true,
@@ -501,7 +501,7 @@ function fromTrades(trades: Tx[], step: number): Candle[] {
 
 const ohlc = (k: Bar, s: number) => ({ open: k.open * s, high: k.high * s, low: k.low * s, close: k.close * s });
 const scaled = (k: Bar, s: number): Bar => ({ ...k, ...ohlc(k, s) });
-const volColor = (k: Bar) => (k.close >= k.open ? 'rgba(47,122,62,0.35)' : 'rgba(255,107,91,0.35)');
+const volColor = (k: Bar) => (k.close >= k.open ? 'rgba(61,220,151,0.35)' : 'rgba(255,107,91,0.35)');
 
 /**
  * Chain candles the way GMGN/TradingView do: each one opens at the previous close, so price moves

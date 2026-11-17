@@ -23,12 +23,12 @@ import { updateSettings, useSettings } from '@/lib/settings';
 import { AboutCard, PositionCard, ThesisBox } from './simple-rail';
 import { SafetyGrid } from './safety-grid';
 import { HiveCard } from './hive-card';
-import { TokenMapTab } from './token-map';
+import { TokenMapTab, warmTokenMap } from './token-map';
 import { useTokenCallouts, type Callout } from '@/lib/callouts';
 import { CallsFeed } from './calls-feed';
 import { useEthUsd } from '@/lib/profile';
 
-import { BubblesTab, DevTokensTab, EarlyBuyersTab, HoldersTab, TopTradersTab, useFetch } from './token-tabs';
+import { DevTokensTab, EarlyBuyersTab, HoldersTab, TopTradersTab, useFetch } from './token-tabs';
 import { TradesTable } from './trades-table';
 import { SHOW_RISK } from '@/lib/risk-labels';
 
@@ -73,6 +73,10 @@ export function TokenView({
   const hydrating = isHydrating(live.hydration);
   const [maker, setMaker] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('trades');
+  // Start building the token map now, so it is ready by the time the tab is opened.
+  useEffect(() => {
+    warmTokenMap(detail.address).catch(() => undefined);
+  }, [detail.address]);
   // Members' calls on this token: the feed column (or Calls tab) and the chart markers.
   const calls = useTokenCallouts(t.address);
   const [selectedCall, setSelectedCall] = useState<string | null>(null);
@@ -167,7 +171,6 @@ export function TokenView({
               onMaker={showMaker}
             />
           )}
-          {tab === 'bubbles' && <BubblesTab address={t.address} />}
           {tab === 'map' && <TokenMapTab address={t.address} />}
           {tab === 'dev' && <DevTokensTab deployer={t.deployer} self={t.address} serverNow={serverNow} />}
         </>
@@ -241,7 +244,7 @@ export function TokenView({
           </div>
           {tabs}
         </div>
-        <aside className="flex min-h-0 flex-col gap-2 lg:overflow-y-auto lg:[scrollbar-width:thin]">
+        <aside className="rail-in flex min-h-0 flex-col gap-2 lg:overflow-y-auto lg:[scrollbar-width:thin]">
           {pro ? (
             <>
               <ModeSwitch />
@@ -902,7 +905,6 @@ function Tabs({
     ['holders', `Holders ${nf.format(holdersCount)}`],
     ['traders', 'Top traders'],
     ['early', 'Early buyers'],
-    ['bubbles', 'Bubble map'],
     ['map', 'Token map'],
     ['dev', "Dev's tokens"],
   ];

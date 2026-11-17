@@ -1,7 +1,7 @@
 /* TokenMap styles, Overmind edition. Everything is scoped under .tm; restyle through the --tm-* variables. */
 .tm {
-  --tm-bg: #000;
-  --tm-glow: rgba(146, 129, 247, 0.06);
+  --tm-bg: #07070a;
+  --tm-glow: rgba(240, 107, 168, 0.08);
   --tm-panel: rgba(0, 0, 0, 0.6);
   --tm-solid: rgba(10, 10, 10, 0.94);
   --tm-text: #ffffff;
@@ -170,7 +170,22 @@
 
 /* on the map pages the stage paints the backdrop (and the bust), so the widget stays clear */
 .map-stage .tm { background: transparent; }
-
 /* Overmind: stat tiles above the map rise in one by one. */
 @keyframes map-stat-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: no-preference) { .map-stat { animation: map-stat-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; } }
+
+/* Overmind: loader orb, satellite and the tab's soft iridescent backdrop. */
+.map-orb { background: linear-gradient(255deg, rgb(250,203,14), rgb(240,107,168) 30%, rgb(120,186,230) 65%, #fff); }
+.map-cta-bg {
+  background:
+    radial-gradient(40% 70% at 85% 20%, rgb(240 107 168 / 0.10), transparent 70%),
+    radial-gradient(35% 60% at 10% 90%, rgb(120 186 230 / 0.12), transparent 70%);
+}
+@keyframes map-orb { 0%, 100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); } 50% { transform: translate(-50%, -50%) scale(1.12) rotate(180deg); } }
+@keyframes map-sat { to { transform: rotate(360deg); } }
+@keyframes map-full-in { from { opacity: 0; transform: scale(0.985); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: no-preference) {
+  .map-orb { animation: map-orb 3s ease-in-out infinite; }
+  .map-sat { animation: map-sat 2.4s linear infinite; }
+  .map-full { animation: map-full-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+}
