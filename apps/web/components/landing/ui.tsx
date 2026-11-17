@@ -3,7 +3,7 @@ import { Reveal } from './reveal';
 /** Overmind's own X account. */
 export const X_URL = 'https://x.com/0xovermind';
 /** The Overmind community on Telegram . */
-export const TG_URL = 'https://t.me/overmindrh';
+export const TG_URL = '';
 
 /** The one content width every landing section uses. */
 export const WRAP = 'mx-auto w-full max-w-7xl px-4 md:px-8';

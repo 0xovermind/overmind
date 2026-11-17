@@ -18,13 +18,19 @@ export interface TokenMetadata {
 }
 
 const PUBLIC_LOGS_RPC = 'https://rpc.mainnet.chain.robinhood.com';
+/** Calls per JSON-RPC batch request (the public RPC rate-limits per call). */
+const BATCH_MAX = 10;
+/** Token-origin lookups: per-call timeout, and how long a token whose lookup failed is left alone. */
+const ORIGIN_TIMEOUT_MS = 4_000;
+const ORIGIN_RETRY_MS = 30 * 60_000;
+const ORIGIN_MISSES = new Map<string, number>();
 
 export class Rpc {
   private id = 0;
   constructor(private url: string) {}
 
-  async call<T>(method: string, params: unknown[], timeoutMs = 30_000): Promise<T> {
-    const res = await this.post({ jsonrpc: '2.0', id: ++this.id, method, params }, timeoutMs);
+  async call<T>(method: string, params: unknown[], timeoutMs = 30_000, retries = 8): Promise<T> {
+    const res = await this.post({ jsonrpc: '2.0', id: ++this.id, method, params }, timeoutMs, retries);
     const body = (await res.json()) as RpcResponse<T>;
     if (body.error) throw new Error(`${method}: ${body.error.message}`);
     return body.result as T;
@@ -32,6 +38,12 @@ export class Rpc {
 
   async batch<T>(calls: { method: string; params: unknown[] }[]): Promise<(T | null)[]> {
     if (calls.length === 0) return [];
+    // The public RPC rate-limits per call, so a big batch trips it at once: send at most 10 per request.
+    if (calls.length > BATCH_MAX) {
+      const out: (T | null)[] = [];
+      for (let i = 0; i < calls.length; i += BATCH_MAX) out.push(...(await this.batch<T>(calls.slice(i, i + BATCH_MAX))));
+      return out;
+    }
     const start = this.id;
     const res = await this.post(calls.map((c, i) => ({ jsonrpc: '2.0', id: start + i + 1, ...c })));
     this.id += calls.length;
@@ -201,10 +213,16 @@ export class Rpc {
   async v4Initialized(ids: string[]): Promise<Map<string, { currency0: Address; currency1: Address; fee: number; tickSpacing: number; hooks: Address }>> {
     const out = new Map<string, { currency0: Address; currency1: Address; fee: number; tickSpacing: number; hooks: Address }>();
     const INIT = '0xdd466e674ea557f56295e2d0218a125ea4b4f0f6f3307b95f85e6110838d6438' as Hex;
+    // Logs always come from the public RPC (see target()), which caps the block range per call: scanning the
+    // chain for Initialize events cost dozens of slow calls per pool and stalled indexing. Unknown hook pools are skipped.
+    if (ids.length) return out;
     const head = await this.blockNumber();
     for (let i = 0; i < ids.length; i += 100) {
       // Few logs per call, so the whole chain fits one request (Alchemy: any range up to 10K logs).
-      const logs = await this.filteredLogs(0n, head, { address: UNISWAP.v4.poolManager, topics: [INIT, ids.slice(i, i + 100) as Hex[]] });
+      // A plain node caps the block range per call: scanning from genesis there means thousands of calls
+      // and a stalled indexer, so only recent pools (~5h) are found and older unknown ones are skipped.
+      const from = /alchemy\.com/.test(this.url) ? 0n : head > 200_000n ? head - 200_000n : 0n;
+      const logs = await this.filteredLogs(from, head, { address: UNISWAP.v4.poolManager, topics: [INIT, ids.slice(i, i + 100) as Hex[]] });
       for (const l of logs) {
         const w = (k: number) => l.data.slice(2 + k * 64, 2 + (k + 1) * 64);
         const ts = BigInt(`0x${w(1)}`);
@@ -221,11 +239,28 @@ export class Rpc {
   }
 
   /** A token's creation: its first Transfer (mint) tx, block and time, plus who sent that tx and to what contract. */
+  get isAlchemy(): boolean {
+    return /alchemy\.com/.test(this.url);
+  }
+
   async tokenOrigin(token: Address) {
+    if (!this.isAlchemy) return null;
+    // Slow lookups (they can take 20s+ on this chain) would stall the poller: give up after a few seconds
+    // and don't ask about that token again for a while. Unknown origin = the token is skipped.
+    const miss = ORIGIN_MISSES.get(token);
+    if (miss && miss > Date.now()) return null;
+    // Alchemy-only method: on a plain node (the public RPC) the origin is unknown and the token is skipped.
     const res = await this.call<{ transfers: { hash: Hex; blockNum: Hex; metadata?: { blockTimestamp?: string } }[] }>(
       'alchemy_getAssetTransfers',
       [{ contractAddresses: [token], category: ['erc20'], order: 'asc', maxCount: '0x1', fromBlock: '0x0', withMetadata: true }],
-    );
+      ORIGIN_TIMEOUT_MS,
+      0,
+    ).catch(() => {
+      // Any failure (unsupported, throttled, slow): unknown origin, try this token again later. Never fail the range.
+      if (ORIGIN_MISSES.size > 20_000) ORIGIN_MISSES.clear();
+      ORIGIN_MISSES.set(token, Date.now() + ORIGIN_RETRY_MS);
+      return { transfers: [] as { hash: Hex; blockNum: Hex; metadata?: { blockTimestamp?: string } }[] };
+    });
     const t = res.transfers[0];
     if (!t) return null;
     const tx = await this.call<{ from: Address; to: Address | null }>('eth_getTransactionByHash', [t.hash]);
@@ -407,7 +442,7 @@ export class Rpc {
     return isLogs && /alchemy.com/.test(this.url) ? PUBLIC_LOGS_RPC : this.url;
   }
 
-  private async post(body: unknown, timeoutMs = 30_000): Promise<Response> {
+  private async post(body: unknown, timeoutMs = 30_000, retries = 8): Promise<Response> {
     const url = this.target(body);
     for (let attempt = 0; ; attempt++) {
       const res = await fetch(url, {
@@ -419,10 +454,10 @@ export class Rpc {
       if (res.ok) return res;
       // Read the body either way: an unread one keeps its connection open (Workers allow 6).
       const text = await res.text();
-      if (attempt >= 5 || (res.status !== 429 && res.status < 500)) {
+      if (attempt >= retries || (res.status !== 429 && res.status < 500)) {
         throw new Error(`RPC HTTP ${res.status}: ${text.slice(0, 200)}`);
       }
-      await new Promise((r) => setTimeout(r, 250 * 2 ** attempt));
+      await new Promise((r) => setTimeout(r, Math.min(8_000, 400 * 2 ** attempt) + Math.random() * 400));
     }
   }
 }

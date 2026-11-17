@@ -126,10 +126,16 @@ interface ExtraQuote {
   usd: number | null;
   pricedAt: number;
 }
-const QUOTE_REFRESH_MS = 60_000;
+const QUOTE_REFRESH_MS = 5 * 60_000;
+/** Quote coins (decimals + USD price) shared by every Pipeline in this isolate: a pipeline is built per
+ * step, and re-reading every quote over a rate-limited public RPC made each step take 20s+. */
+const SHARED_QUOTES = new Map<string, ExtraQuote>();
+/** Discovery of unknown pools per range (see discover): time budget and pools looked up. */
+const DISCOVER_BUDGET_MS = 10_000;
+const DISCOVER_MAX_IDS = 40;
 
 export class Pipeline {
-  private quotes = new Map<string, ExtraQuote>();
+  private quotes = SHARED_QUOTES;
   private pools = new Map<string, PoolInfo>();
   private tokens = new Map<string, TokenMeta>();
   /** Last accepted price per token: the reference for the outlier guard. */
@@ -174,7 +180,7 @@ export class Pipeline {
     }
     const [eth] = await this.sql<{ value: { usd: number } }[]>`select value from indexer_state where key = 'eth_usd'`;
     this.ethUsd = eth?.value.usd ?? null;
-    const extra = [...new Set(pools.map((p) => p.quote).filter((q) => !ETH_LIKE.has(q) && q !== QUOTES.USDG))];
+    const extra = [...new Set(pools.map((p) => p.quote).filter((q) => !ETH_LIKE.has(q) && q !== QUOTES.USDG && !this.quotes.has(q)))];
     if (extra.length) {
       const meta = await this.rpc.tokenMetadata(extra as Address[]);
       meta.forEach((m) => this.quotes.set(m.token, { decimals: m.decimals, usd: null, pricedAt: 0 }));
@@ -525,7 +531,10 @@ export class Pipeline {
       // Hook pools (Doppler, ...) never pass through PositionManager: read their Initialize event instead.
       const missing = missV4.filter((id) => !this.poolKeyCache.get(id));
       if (missing.length) {
-        for (const [id, k] of await this.rpc.v4Initialized(missing)) this.poolKeyCache.set(id, { ...k, dex: 'uniswap-v4', venue: null });
+        const found = await this.rpc.v4Initialized(missing);
+        for (const [id, k] of found) this.poolKeyCache.set(id, { ...k, dex: 'uniswap-v4', venue: null });
+        // Not found: remember that too, or the same pools are looked up again on every range.
+        for (const id of missing) if (!found.has(id)) this.poolKeyCache.set(id, null);
       }
     }
     if (missPairs.length) {
@@ -556,7 +565,14 @@ export class Pipeline {
     const T = this.discoverTimes = {} as Record<string, number>;
     let t0 = Date.now();
     const lap = (k: string) => { T[k] = (T[k] ?? 0) + Date.now() - t0; t0 = Date.now(); };
-    const keys = await this.poolKeysFor(v4Ids.filter((id) => this.shouldCheck(id)), pairAddrs.filter((id) => this.shouldCheck(id)), pairKind);
+    // Discovery is best-effort: cap it per range (pools left over are looked at in a later range) so a busy
+    // stretch of unknown pools on a rate-limited RPC cannot hold back indexing of the pools we track.
+    const deadline = Date.now() + DISCOVER_BUDGET_MS;
+    const keys = await this.poolKeysFor(
+      v4Ids.filter((id) => this.shouldCheck(id)).slice(0, DISCOVER_MAX_IDS),
+      pairAddrs.filter((id) => this.shouldCheck(id)).slice(0, DISCOVER_MAX_IDS),
+      pairKind,
+    );
     lap('keys');
     if (!keys.length) return false;
     const now = Math.floor(Date.now() / 1000);
@@ -574,6 +590,9 @@ export class Pipeline {
       let q1 = isQuote(key.currency1, key.currency0);
       if (q0 && q1) { this.ignorePool(id, null); continue; }
       if (!q0 && !q1) {
+        // Each lookup costs several RPC calls: past a few seconds per range, leave the rest for a later range
+        // (not ignored) so a burst of coin/coin pools can't stall indexing.
+        if (Date.now() > deadline) continue;
         // Paired with another coin (a stock token, or a memecoin used as quote): work out which side is the quote.
         const quote = await this.resolveQuote(key.currency0, key.currency1);
         lap('resolveQuote');
@@ -586,10 +605,10 @@ export class Pipeline {
       if (this.opts.onlyToken && token !== this.opts.onlyToken) continue;
       candidates.push({ id, key, token, quote: (q0 ? key.currency0 : key.currency1) as Address });
     }
-    const unknown = [...new Set(candidates.map((c) => c.token).filter((t) => !this.tokens.has(t)))].slice(0, MAX_ORIGIN_LOOKUPS);
+    const unknown = Date.now() > deadline ? [] : [...new Set(candidates.map((c) => c.token).filter((t) => !this.tokens.has(t)))].slice(0, MAX_ORIGIN_LOOKUPS);
     lap('candidates');
     const origins = new Map<string, Awaited<ReturnType<Rpc['tokenOrigin']>>>();
-    for (let i = 0; i < unknown.length; i += 4) {
+    for (let i = 0; i < unknown.length && Date.now() < deadline; i += 4) {
       await Promise.all(unknown.slice(i, i + 4).map(async (t) => origins.set(t, await this.rpc.tokenOrigin(t))));
     }
     lap(`origins(${unknown.length})`);

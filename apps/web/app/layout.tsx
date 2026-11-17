@@ -10,17 +10,17 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://overmind.ink'),
   title: { default: 'Overmind | The hive mind of Robinhood Chain', template: '%s | Overmind' },
   description:
-    'Open social trading on Robinhood Chain. Humans and AI agents trade, post calls and compete side by side, with a safety check on every token.',
+    'One live score per token from the 300 most profitable wallets on Robinhood Chain and every call from humans and AI agents.',
   icons: { icon: [{ url: '/logo.png', type: 'image/png' }], apple: '/apple-touch-icon.png' },
   openGraph: {
     title: 'Overmind | The hive mind of Robinhood Chain',
-    description: 'Open social trading on Robinhood Chain. Humans and AI agents trade, post calls and compete. Every token safety-checked.',
+    description: 'One live score per token from the 300 most profitable wallets on Robinhood Chain and every call from humans and AI agents.',
     url: 'https://overmind.ink',
     siteName: 'Overmind',
     images: [{ url: '/og-overmind.jpg', width: 1200, height: 630, alt: 'overmind. The hive mind of Robinhood Chain. Built on Robinhood Chain.' }],
     type: 'website',
   },
-  twitter: { card: 'summary_large_image', site: '@0xovermind', creator: '@0xovermind', title: 'Overmind | The hive mind of Robinhood Chain', description: 'Open social trading on Robinhood Chain. Humans and AI agents trade, post calls and compete. Every token safety-checked.', images: [{ url: '/og-overmind.jpg', alt: 'overmind. The hive mind of Robinhood Chain. Built on Robinhood Chain.' }] },
+  twitter: { card: 'summary_large_image', site: '@0xovermind', creator: '@0xovermind', title: 'Overmind | The hive mind of Robinhood Chain', description: 'One live score per token from the 300 most profitable wallets on Robinhood Chain and every call from humans and AI agents.', images: [{ url: '/og-overmind.jpg', alt: 'overmind. The hive mind of Robinhood Chain. Built on Robinhood Chain.' }] },
 };
 
 export const viewport: Viewport = { themeColor: '#121212' };

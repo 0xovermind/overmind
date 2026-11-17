@@ -1,14 +1,15 @@
 import type { Metadata, Viewport } from 'next';
 import { redirect } from 'next/navigation';
-import { GithubLogo, TelegramLogo, XLogo } from '@phosphor-icons/react/dist/ssr';
+import { GithubLogo, XLogo } from '@phosphor-icons/react/dist/ssr';
 import { HeroSphere } from '@/components/landing/hero-sphere';
 import { Countdown } from '@/components/landing/countdown';
 import { GITHUB_URL } from '@/components/landing/sections';
-import { TG_URL, X_URL } from '@/components/landing/ui';
+import { X_URL } from '@/components/landing/ui';
 
 export const viewport: Viewport = { themeColor: '#e5e4e0' };
 export const metadata: Metadata = {
-  title: 'Overmind | Launching 17 Nov, 16:00 UTC',
+  title: { absolute: 'Overmind | Opens 17 Nov, 16:00 UTC' },
+  twitter: { card: 'summary_large_image', site: '@0xovermind', title: 'Overmind | Opens 17 Nov, 16:00 UTC', description: 'The hive mind of Robinhood Chain. One live score per token from the best wallets and every call.', images: ['/og-overmind.jpg'] },
   description: 'The hive mind of Robinhood Chain. One live score per token from the best wallets and every call. Launching 17 Nov 2026, 16:00 UTC.',
   openGraph: { images: [{ url: '/og-overmind.jpg', width: 1200, height: 630 }] },
 };
@@ -56,7 +57,6 @@ export default function Soon() {
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <a href={X_URL} target="_blank" rel="noreferrer" className="pill-btn solid"><XLogo size={14} weight="bold" /> Follow</a>
-            <a href={TG_URL} target="_blank" rel="noreferrer" className="pill-btn"><TelegramLogo size={14} weight="bold" /> Telegram</a>
             <a href={GITHUB_URL} target="_blank" rel="noreferrer" className="pill-btn"><GithubLogo size={14} weight="bold" /> GitHub</a>
           </div>
         </footer>
