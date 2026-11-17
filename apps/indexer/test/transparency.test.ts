@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 vi.mock('cloudflare:workers', () => ({ DurableObject: class {} }));
 
 import type { Sql } from 'postgres';
-import { OVERMIND_TREASURY } from '@overmind/trade';
+import { LEGACY_TREASURIES, OVERMIND_TREASURY } from '@overmind/trade';
 import { freshDb, pgAvailable } from '../../../packages/agents/test/pg';
 import { feeTotals, formatUnits, transparency } from '../src/transparency';
 import { resetPauseCache } from '../src/pause';
@@ -84,7 +84,8 @@ describe.skipIf(!ok)('GET /transparency (local Postgres)', () => {
 });
 
 describe('readBalances', () => {
-  it('totals the Safe and the legacy treasury, and lists each account', async () => {
+  // Overmind has no legacy treasury yet; the case comes back when one is added.
+  it.skipIf(LEGACY_TREASURIES.length === 0)('totals the Safe and the legacy treasury, and lists each account', async () => {
     const { readBalances } = await import('../src/transparency');
     const { LEGACY_TREASURIES } = await import('@overmind/trade');
     const legacy = LEGACY_TREASURIES[0]!.toLowerCase();

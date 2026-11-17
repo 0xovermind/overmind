@@ -19,7 +19,9 @@ const POOL = '0x9001000000000000000000000000000000000009';
 const ROUTER = DEFAULT_TRADE_CONFIG.universalRouter.toLowerCase();
 const TREASURY = DEFAULT_TRADE_CONFIG.feeRecipient.toLowerCase();
 const BUY_TX = `0x${'b1'.repeat(32)}`;
-const LEGACY = LEGACY_TREASURIES[0]!.toLowerCase();
+// Overmind has no legacy treasury yet: a stand-in keeps the module loadable; the legacy cases are skipped.
+const LEGACY = (LEGACY_TREASURIES[0] ?? '0x000000000000000000000000000000000000beef').toLowerCase();
+const HAS_LEGACY = LEGACY_TREASURIES.length > 0;
 const SAFE_SINGLETON = '0x5afe000000000000000000000000000000005afe';
 const LEGACY_SELL_TX = `0x${'1e'.repeat(32)}`;
 const PROXY_SELL_TX = `0x${'9a'.repeat(32)}`;
@@ -246,7 +248,7 @@ describe.skipIf(!pg)('trade ledger', () => {
     expect(Number(row!.fee_bps)).toBeCloseTo(Number(BASE_BPS));
   });
 
-  it('counts a fee paid to a legacy treasury as correct, and a fee to the Safe through its proxy once', async () => {
+  it.skipIf(!HAS_LEGACY)('counts a fee paid to a legacy treasury as correct, and a fee to the Safe through its proxy once', async () => {
     for (const h of [LEGACY_SELL_TX, PROXY_SELL_TX]) {
       await t.call('POST', '/trades', { auth: carol, body: { txHash: h, chainId: 4663, source: { kind: 'web' } } });
       expect(await confirmTrade(t.sql, t.env as never, h, false)).toBe('done');
@@ -307,7 +309,7 @@ describe.skipIf(!pg)('trade ledger', () => {
       expect(queued).toEqual([{ kind: 'trade-confirm', tx: CMISS_TX }]);
     });
 
-    it('a curve fee transfer to a legacy treasury is a correct fee', async () => {
+    it.skipIf(!HAS_LEGACY)('a curve fee transfer to a legacy treasury is a correct fee', async () => {
       await post(carol, CLEGACY_TX, CLEGACY_FEE_TX);
       expect(await confirmTrade(t.sql, t.env as never, CLEGACY_TX, false)).toBe('done');
       expect(await rowOf(CLEGACY_TX)).toMatchObject({ status: 'confirmed', fee_amount: ((E18 * BASE_BPS) / 10_000n).toString(), flags: [`fee_tx:${CLEGACY_FEE_TX}`] });
