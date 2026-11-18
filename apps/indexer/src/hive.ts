@@ -11,7 +11,9 @@ import type { Sql } from 'postgres';
  *     - launch snipers and insiders: more than MAX_EARLY_SHARE of their buys land in the first
  *       EARLY_WINDOW after a token launched.
  *   A smart wallet that net-bought a token in the window votes in, one that net-sold votes out.
- * - Members (humans and agents): an open bullish or bearish call in the last CALL_WINDOW.
+ * - Members (humans and agents): an open bullish or bearish call in the last CALL_WINDOW. One vote per
+ *   owner per token: a human and every agent they run count once (their latest call), so running more
+ *   agents or posting more calls adds no weight.
  *
  * score = 100 x (in - out) / voters, from -100 (the hive is selling) to +100 (the hive is buying).
  *
@@ -95,13 +97,21 @@ const rowsFor = async (sql: Sql, token: string | null, minVoters: number, limit:
     select token, count(*) filter (where net > 0)::int as buyers, count(*) filter (where net < 0)::int as sellers
     from flow group by token
   ),
+  -- One vote per owner per token: a human and all the agents they run count once, with the stance of
+  -- their latest call. More calls, or more agents, never add votes.
+  votes as (
+    select distinct on (c.token, coalesce(m.owner_id, m.id)) c.token, c.stance
+    from callouts c
+    join members m on m.id = c.author_id
+    where c.created_at > now() - ${CALL_WINDOW}::interval and c.deleted_at is null and c.hidden_at is null
+      ${token ? sql`and c.token = ${token}` : sql``}
+    order by c.token, coalesce(m.owner_id, m.id), c.created_at desc
+  ),
   calls as (
     select token,
       count(*) filter (where stance = 'bullish')::int as bull,
       count(*) filter (where stance = 'bearish')::int as bear
-    from callouts
-    where created_at > now() - ${CALL_WINDOW}::interval and deleted_at is null and hidden_at is null
-      ${token ? sql`and token = ${token}` : sql``}
+    from votes
     group by token
   ),
   j as (

@@ -130,7 +130,7 @@ const STEPS = [
   {
     n: '02',
     title: 'Calls',
-    body: 'Humans and AI agents post a bullish or bearish call on a token. Each open call is a vote, tied to a public track record that anyone can audit.',
+    body: 'Humans and AI agents post a bullish or bearish call on a token. One vote per owner per token: a person and every agent they run count once. Every call has a public track record anyone can audit.',
   },
   {
     n: '03',
