@@ -24,6 +24,12 @@ const BATCH_MAX = 10;
 const ORIGIN_TIMEOUT_MS = 4_000;
 const ORIGIN_RETRY_MS = 30 * 60_000;
 const ORIGIN_MISSES = new Map<string, number>();
+/** Block timestamps for logs from a node that doesn't include them (see withTimestamps). */
+const BLOCK_TIMES = new Map<bigint, number>();
+/** Up to this many distinct blocks are read exactly; more are interpolated between the two ends. */
+const EXACT_BLOCK_TIMES = 40;
+/** The public RPC sometimes sends blockTimestamp "0x0": treat that as missing too. */
+const hasTime = (l: RawLog) => !!l.blockTimestamp && BigInt(l.blockTimestamp) !== 0n;
 
 export class Rpc {
   private id = 0;
@@ -58,9 +64,39 @@ export class Rpc {
 
   /** One OR-filtered getLogs over [from, to]. */
   async logs(from: bigint, to: bigint, topics: Hex[]): Promise<RawLog[]> {
-    return this.call<RawLog[]>('eth_getLogs', [
+    const logs = await this.call<RawLog[]>('eth_getLogs', [
       { fromBlock: `0x${from.toString(16)}`, toBlock: `0x${to.toString(16)}`, topics: [topics] },
     ]);
+    return this.withTimestamps(logs);
+  }
+
+  /**
+   * Alchemy puts `blockTimestamp` on every log; a plain node (the public RPC) doesn't. Fill it in so
+   * trades never land at time 0: exact block times for a few blocks, and for many blocks the two ends
+   * of the range read exactly with the rest interpolated (seconds off at most). Cached per block.
+   */
+  async withTimestamps(logs: RawLog[]): Promise<RawLog[]> {
+    const missing = [...new Set(logs.filter((l) => !hasTime(l)).map((l) => BigInt(l.blockNumber)))].sort((a, b) => (a < b ? -1 : 1));
+    if (!missing.length) return logs;
+    const need = missing.filter((b) => !BLOCK_TIMES.has(b));
+    const exact = need.length <= EXACT_BLOCK_TIMES ? need : [need[0]!, need[need.length - 1]!];
+    if (exact.length) {
+      const res = await this.batch<{ timestamp: Hex } | null>(exact.map((b) => ({ method: 'eth_getBlockByNumber', params: [`0x${b.toString(16)}`, false] })));
+      exact.forEach((b, i) => { const r = res[i]; if (r?.timestamp) BLOCK_TIMES.set(b, Number(BigInt(r.timestamp))); });
+    }
+    const lo = need[0], hi = need[need.length - 1];
+    const tLo = lo !== undefined ? BLOCK_TIMES.get(lo) : undefined, tHi = hi !== undefined ? BLOCK_TIMES.get(hi) : undefined;
+    for (const b of need) {
+      if (BLOCK_TIMES.has(b) || lo === undefined || hi === undefined || tLo === undefined || tHi === undefined) continue;
+      BLOCK_TIMES.set(b, Math.round(tLo + ((tHi - tLo) * Number(b - lo)) / Math.max(1, Number(hi - lo))));
+    }
+    if (BLOCK_TIMES.size > 20_000) BLOCK_TIMES.clear();
+    for (const l of logs) {
+      if (hasTime(l)) continue;
+      const t = BLOCK_TIMES.get(BigInt(l.blockNumber));
+      if (t !== undefined) (l as { blockTimestamp?: Hex }).blockTimestamp = `0x${t.toString(16)}` as Hex;
+    }
+    return logs;
   }
 
   /**
@@ -389,7 +425,7 @@ export class Rpc {
         throw err;
       });
       if (budget && (budget.left -= logs.length) < 0) throw new HistoryTooLarge();
-      return logs;
+      return this.withTimestamps(logs);
     } catch (err) {
       if (err instanceof HistoryTooLarge) throw err;
       if (to - from < 2n || !/response size|exceed|too many|limit|range/i.test(String(err))) throw err;
