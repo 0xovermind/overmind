@@ -9,7 +9,10 @@ import type { Sql } from 'postgres';
  *     - bots with huge trade counts (> BOT_TRADES),
  *     - spray snipers that touch more than MAX_TOKENS different tokens,
  *     - launch snipers and insiders: more than MAX_EARLY_SHARE of their buys land in the first
- *       EARLY_WINDOW after a token launched.
+ *       EARLY_WINDOW after a token launched,
+ *     - devs, teams and airdrop farmers: more than MAX_FREE_SHARE of what they sold they never bought.
+ *   Realized PnL only counts what a wallet bought, and leaves out positions sized off a broken quote
+ *   price (bought for more than MAX_CAP_SHARE of the token's peak market cap).
  *   A smart wallet that net-bought a token in the window votes in, one that net-sold votes out.
  * - Members (humans and agents): an open bullish or bearish call in the last CALL_WINDOW. One vote per
  *   owner per token: a human and every agent they run count once (their latest call), so running more
@@ -27,6 +30,10 @@ const SMART_SET = 300;
 const BOT_TRADES = 2000;
 const MAX_TOKENS = 25;
 const MAX_EARLY_SHARE = 0.5;
+/** Wallets selling more than this share of tokens they never bought (devs, teams, airdrops) are left out. */
+const MAX_FREE_SHARE = 0.2;
+/** A position bought for more than this share of the token's peak market cap is a broken price, not a trade. */
+const MAX_CAP_SHARE = 0.25;
 const EARLY_WINDOW = '2 minutes';
 const FLOW_WINDOW = '24 hours';
 const CALL_WINDOW = '72 hours';
@@ -55,12 +62,30 @@ let smartCache: { at: number; wallets: string[] } | null = null;
 export async function smartWallets(sql: Sql): Promise<string[]> {
   if (smartCache && Date.now() - smartCache.at < SMART_TTL_MS) return smartCache.wallets;
   const rows = await sql<{ wallet: string }[]>`
-    with cand as (
-      select wallet, sum(realized_usd) as realized, count(distinct token) as tokens
-      from positions
-      group by wallet
-      having sum(realized_usd) > 0 and sum(buys + sells) >= 3 and sum(buys + sells) <= ${BOT_TRADES}
-        and count(distinct token) <= ${MAX_TOKENS}
+    with pos as (
+      -- Profit only on what the wallet bought: selling tokens it was sent (a team allocation, an airdrop)
+      -- is not a read of the market. A position "bought" for more than a quarter of the token's peak
+      -- market cap comes from a broken quote price, not a trade, and is left out.
+      select p.wallet, p.token, p.buys, p.sells,
+        case when p.sold_tokens > 0 then p.realized_usd * (1 - p.unbacked_sold_tokens::float8 / p.sold_tokens::float8)
+             else p.realized_usd end as realized
+      from positions p join tokens t on t.address = p.token
+      where p.buys > 0
+        and p.bought_usd <= ${MAX_CAP_SHARE} * greatest(coalesce(t.ath_market_cap_usd, 0), coalesce(t.market_cap_usd, 0))
+    ),
+    free as (
+      -- Devs, teams and airdrop farmers: most of what they sell they never bought.
+      select wallet, sum(unbacked_sold_tokens)::float8 / nullif(sum(sold_tokens), 0)::float8 as share
+      from positions group by wallet
+    ),
+    cand as (
+      select pos.wallet, sum(pos.realized) as realized, count(distinct pos.token) as tokens
+      from pos
+      left join free f on f.wallet = pos.wallet
+      where coalesce(f.share, 0) <= ${MAX_FREE_SHARE}
+      group by pos.wallet
+      having sum(pos.realized) > 0 and sum(pos.buys + pos.sells) >= 3 and sum(pos.buys + pos.sells) <= ${BOT_TRADES}
+        and count(distinct pos.token) <= ${MAX_TOKENS}
     ),
     early as (
       select s.trader,

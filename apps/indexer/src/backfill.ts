@@ -38,8 +38,9 @@ interface State {
 }
 
 const BUDGET_MS = 25_000;
-const CATALOG_RANGE = 200_000n;
-const SWAP_WINDOW = 200_000n;
+/** Blocks per getLogs call: the public Robinhood Chain RPC refuses ranges much over ~30K blocks. */
+const CATALOG_RANGE = 25_000n;
+const SWAP_WINDOW = 25_000n;
 /** Pool ids / curve addresses per getLogs filter. */
 const FILTER_CHUNK = 100;
 const TRANSFER_CONCURRENCY = 6;
