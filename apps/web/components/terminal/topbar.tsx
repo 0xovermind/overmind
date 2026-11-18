@@ -18,6 +18,7 @@ const NAV = [
   { href: '/trenches', label: 'Markets' },
   { href: '/feed', label: 'Calls' },
   { href: '/agents', label: 'Agents' },
+  { href: '/traders', label: 'Traders' },
   { href: '/leaderboard', label: 'Ranks' },
   { href: '/watchlist', label: 'Watchlist' },
 ];

@@ -57,11 +57,17 @@ export interface HiveRow {
 }
 
 /** The smart set is expensive (it reads every position and swap of the candidates): cached for a few minutes. */
-let smartCache: { at: number; wallets: string[] } | null = null;
+export interface SmartWallet { wallet: string; realized: number; trades: number; tokens: number }
+let smartCache: { at: number; rows: SmartWallet[] } | null = null;
 
 export async function smartWallets(sql: Sql): Promise<string[]> {
-  if (smartCache && Date.now() - smartCache.at < SMART_TTL_MS) return smartCache.wallets;
-  const rows = await sql<{ wallet: string }[]>`
+  return (await smartSet(sql)).map((r) => r.wallet);
+}
+
+/** The smart set with each wallet's realized profit (bought part only), trade count and token count. */
+export async function smartSet(sql: Sql): Promise<SmartWallet[]> {
+  if (smartCache && Date.now() - smartCache.at < SMART_TTL_MS) return smartCache.rows;
+  const rows = await sql<{ wallet: string; realized: string; trades: string; tokens: string }[]>`
     with pos as (
       -- Profit only on what the wallet bought: selling tokens it was sent (a team allocation, an airdrop)
       -- is not a read of the market. A position "bought" for more than a quarter of the token's peak
@@ -79,7 +85,7 @@ export async function smartWallets(sql: Sql): Promise<string[]> {
       from positions group by wallet
     ),
     cand as (
-      select pos.wallet, sum(pos.realized) as realized, count(distinct pos.token) as tokens
+      select pos.wallet, sum(pos.realized) as realized, sum(pos.buys + pos.sells) as trades, count(distinct pos.token) as tokens
       from pos
       left join free f on f.wallet = pos.wallet
       where coalesce(f.share, 0) <= ${MAX_FREE_SHARE}
@@ -96,14 +102,14 @@ export async function smartWallets(sql: Sql): Promise<string[]> {
       join tokens t on t.address = s.token
       group by s.trader
     )
-    select c.wallet
+    select c.wallet, c.realized, c.trades, c.tokens
     from cand c
     left join early e on e.trader = c.wallet
     where coalesce(e.early / nullif(e.buys, 0), 0) <= ${MAX_EARLY_SHARE}
     order by c.realized desc
     limit ${SMART_SET}`;
-  smartCache = { at: Date.now(), wallets: rows.map((r) => r.wallet) };
-  return smartCache.wallets;
+  smartCache = { at: Date.now(), rows: rows.map((r) => ({ wallet: r.wallet, realized: Number(r.realized), trades: Number(r.trades), tokens: Number(r.tokens) })) };
+  return smartCache.rows;
 }
 
 const rowsFor = async (sql: Sql, token: string | null, minVoters: number, limit: number) => {
@@ -167,6 +173,50 @@ const rowsFor = async (sql: Sql, token: string | null, minVoters: number, limit:
 export async function hiveBoard(sql: Sql, limit = 30) {
   const rows = await rowsFor(sql, null, 2, limit);
   return { window: FLOW_WINDOW, smart_wallets: (await smartWallets(sql)).length, tokens: rows };
+}
+
+/**
+ * The top traders: the smart set ranked by realized profit on what they bought, with each wallet's best
+ * token, what it holds now (top 3 by value) and when it last traded.
+ */
+export async function smartTraders(sql: Sql, limit = 100) {
+  const set = (await smartSet(sql)).slice(0, limit);
+  if (!set.length) return { traders: [] };
+  const wallets = set.map((r) => r.wallet);
+  const best = await sql<{ wallet: string; symbol: string | null; address: string; image_url: string | null; realized: number }[]>`
+    select distinct on (p.wallet) p.wallet, t.symbol, t.address, t.image_url, p.realized_usd::float8 as realized
+    from positions p join tokens t on t.address = p.token
+    where p.wallet = any(${wallets}::text[]) and p.buys > 0
+    order by p.wallet, p.realized_usd desc`;
+  const held = await sql<{ wallet: string; symbol: string | null; address: string; image_url: string | null; value: number }[]>`
+    select wallet, symbol, address, image_url, value from (
+      select p.wallet, t.symbol, t.address, t.image_url,
+        (p.held_tokens::float8 / power(10, t.decimals)) * t.price_usd::float8 as value,
+        row_number() over (partition by p.wallet order by (p.held_tokens::float8 / power(10, t.decimals)) * t.price_usd::float8 desc) as rn
+      from positions p join tokens t on t.address = p.token
+      where p.wallet = any(${wallets}::text[]) and p.held_tokens > 0 and t.price_usd is not null
+    ) x where rn <= 3 and value >= 1`;
+  const last = await sql<{ wallet: string; at: Date }[]>`
+    select trader as wallet, max(time) as at from swaps where trader = any(${wallets}::text[]) and time > '2000-01-01' group by trader`;
+  const bestBy = new Map(best.map((b) => [b.wallet, b]));
+  const lastBy = new Map(last.map((l) => [l.wallet, l.at]));
+  const heldBy = new Map<string, (typeof held)[number][]>();
+  for (const h of held) heldBy.set(h.wallet, [...(heldBy.get(h.wallet) ?? []), h]);
+  return {
+    traders: set.map((r, i) => {
+      const b = bestBy.get(r.wallet);
+      return {
+        rank: i + 1,
+        wallet: r.wallet,
+        realizedUsd: Math.round(r.realized),
+        trades: r.trades,
+        tokens: r.tokens,
+        best: b ? { address: b.address, symbol: b.symbol, imageUrl: b.image_url, realizedUsd: Math.round(b.realized) } : null,
+        holding: (heldBy.get(r.wallet) ?? []).sort((a, z) => z.value - a.value).map((h) => ({ address: h.address, symbol: h.symbol, imageUrl: h.image_url, valueUsd: Math.round(h.value) })),
+        lastTradeAt: lastBy.get(r.wallet) ?? null,
+      };
+    }),
+  };
 }
 
 /** One token's consensus (null when nobody in the hive has a view yet). */

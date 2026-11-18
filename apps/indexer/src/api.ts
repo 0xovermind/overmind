@@ -15,7 +15,7 @@ import { refreshSignalsIfStale } from './signals-refresh';
 import { page, repairBalances, walletHoldings, walletPosition } from './wallets';
 import { PAUSED_BODY, readPause } from './pause';
 import { TRANSPARENCY_CACHE_S, transparency } from './transparency';
-import { hiveBoard, hiveToken } from './hive';
+import { hiveBoard, hiveToken, smartTraders } from './hive';
 
 type Ctx = { Bindings: Env; Variables: { sql: Sql } };
 
@@ -279,6 +279,8 @@ api.get('/transparency', async (c) => c.json(
 /** Overmind Consensus: the hive board, and one token's view (see hive.ts). */
 api.get('/hive', async (c) => c.json(await hiveBoard(c.var.sql, Math.min(Number(c.req.query('limit') ?? 30), 60)), 200, cache(20)));
 api.get('/hive/:address', async (c) => c.json({ consensus: await hiveToken(c.var.sql, addr(c.req.param('address'))) }, 200, cache(20)));
+/** The top traders: the smart set with each wallet's best token and current holdings (see hive.ts). */
+api.get('/traders', async (c) => c.json(await smartTraders(c.var.sql, Math.min(Number(c.req.query('limit') ?? 100) || 100, 300)), 200, cache(60)));
 
 /** Headline numbers for the landing page. */
 api.get('/stats', async (c) => {
