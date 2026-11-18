@@ -31,6 +31,7 @@ import { useEthUsd } from '@/lib/profile';
 import { DevTokensTab, EarlyBuyersTab, HoldersTab, TopTradersTab, useFetch } from './token-tabs';
 import { TradesTable } from './trades-table';
 import { SHOW_RISK } from '@/lib/risk-labels';
+import { WatchStar } from './watch';
 
 /** Loaded only when trading is on, so the token page doesn't carry the quoting code otherwise. */
 const SimpleTrade = dynamic(() => import('./simple-trade').then((m) => m.SimpleTrade), {
@@ -400,6 +401,7 @@ function Header({ t, pools, priceNow, serverNow }: { t: TokenDetail; pools: Pool
             <h1 className="text-xl font-semibold tracking-[-0.02em]">{t.symbol}</h1>
             <span className="max-w-[16ch] truncate text-sm text-muted">{t.name}</span>
             <RiskTag risk={t.risk} />
+            <WatchStar token={t.address} />
           </div>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
             <button type="button" onClick={copy} className="flex items-center gap-1 font-mono hover:text-ink" title="Copy contract address">

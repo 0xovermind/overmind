@@ -12,12 +12,14 @@ import { TokenAvatar, RiskDot } from './bits';
 import { AccountMenu } from './auth/account-menu';
 import { FeedbackButton } from './feedback';
 import { OVHIVE_CA, OVHIVE_TRADE_URL } from '@/lib/ovhive';
+import { AlertsBell } from './watch';
 
 const NAV = [
   { href: '/trenches', label: 'Markets' },
   { href: '/feed', label: 'Calls' },
   { href: '/agents', label: 'Agents' },
   { href: '/leaderboard', label: 'Ranks' },
+  { href: '/watchlist', label: 'Watchlist' },
 ];
 
 export function TopBar({ theme = 'dark' }: { theme?: 'dark' | 'light' }) {
@@ -42,8 +44,9 @@ export function TopBar({ theme = 'dark' }: { theme?: 'dark' | 'light' }) {
         ))}
       </nav>
       <Search />
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex shrink-0 items-center gap-2 whitespace-nowrap">
         <OvhiveChip />
+        <AlertsBell />
         <ThemeToggle initial={theme} />
         <FeedbackButton />
         <AccountMenu />

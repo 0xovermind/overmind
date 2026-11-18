@@ -25,6 +25,7 @@ export { Gateway } from './gateway';
 export { TokenHydrator, RpcBudget } from './hydrator';
 import { hydrator } from './hydrator';
 import { applyLiftGraduations, liftGraduated, syncLiftProgress } from './liftfun';
+import { checkWatched } from './watch';
 
 /** Follow-up delays for launch metadata that wasn't loadable on the first try. */
 const METADATA_RETRY_S = [10, 60, 300, 1800];
@@ -480,6 +481,18 @@ export default {
         if (moved.length) console.log(`supply: ${changes.length} read, ${moved.length} changed (${moved.slice(0, 5).map((x) => x.symbol).join(', ')})`);
       } catch (err) {
         console.error('supply refresh failed', err);
+      } finally {
+        await sql.end({ timeout: 5 });
+      }
+    }
+    // Every 5 minutes: re-read the hive on starred tokens and alert watchers when a reading flips (watch.ts).
+    if (minute % 5 === 4) {
+      const sql = postgres(dbUrl(env), { max: 1, fetch_types: false, prepare: false });
+      try {
+        const r = await checkWatched(sql);
+        if (r.alerts) console.log(`hive alerts: ${r.flips} flips on ${r.tokens} watched tokens, ${r.alerts} alerts`);
+      } catch (err) {
+        console.error('hive alerts failed', err);
       } finally {
         await sql.end({ timeout: 5 });
       }
