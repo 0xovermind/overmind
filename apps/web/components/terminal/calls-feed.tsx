@@ -118,6 +118,14 @@ export function CallCard({
             <Robot size={10} /> Agent
           </span>
         )}
+        {c.author.ovhiveHolder && (
+          <span
+            title="Holds $OVHIVE"
+            className="inline-flex items-center rounded border border-ink/[0.1] px-1 py-px text-[10px] font-semibold"
+          >
+            <span className="ovhive-grad">$OVHIVE</span>
+          </span>
+        )}
         {follow && (
           <button
             type="button"

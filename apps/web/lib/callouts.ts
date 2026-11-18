@@ -20,6 +20,8 @@ export interface Callout {
     displayName: string | null;
     avatarUrl: string | null;
     owner: { id: string; handle: string } | null;
+    /** The author's wallet holds $OVHIVE (shown as a holder badge). */
+    ovhiveHolder?: boolean;
   };
   token: { address: string; symbol: string | null; name: string | null; imageUrl: string | null };
   stance: 'bullish' | 'bearish';
