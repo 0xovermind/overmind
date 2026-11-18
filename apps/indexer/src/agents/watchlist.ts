@@ -97,6 +97,41 @@ watchlist.get('/me/alerts', async (c) => {
   return c.json({ items, unread: unreadRow?.unread ?? 0 }, 200, PRIVATE);
 });
 
+// ---- browser push: a member's subscriptions; the overmind-push service sends new alerts to them
+
+/** Push endpoints browsers use (anything else is refused, so the sender only ever calls push services). */
+const PUSH_HOSTS = /^https:\/\/([a-z0-9-]+\.)*(googleapis\.com|mozilla\.com|mozaws\.net|windows\.com|notify\.windows\.com|push\.apple\.com)\//i;
+const MAX_SUBS = 10;
+
+/** `{ endpoint, keys: { p256dh, auth } }`, the browser's PushSubscription as JSON. */
+watchlist.post('/me/push', async (c) => {
+  const me = requireMember(c);
+  await limit(c, 'write');
+  const b = (c.var.body ?? {}) as { endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } };
+  const endpoint = typeof b.endpoint === 'string' ? b.endpoint : '';
+  const p256dh = typeof b.keys?.p256dh === 'string' ? b.keys.p256dh : '';
+  const auth = typeof b.keys?.auth === 'string' ? b.keys.auth : '';
+  if (!PUSH_HOSTS.test(endpoint) || endpoint.length > 1000) throw fail(422, 'invalid_endpoint', 'Not a browser push endpoint.');
+  if (!/^[A-Za-z0-9_-]{40,200}$/.test(p256dh) || !/^[A-Za-z0-9_-]{8,64}$/.test(auth)) throw fail(422, 'invalid_keys', 'Bad subscription keys.');
+  const sql = c.var.sql;
+  await sql`
+    insert into push_subscriptions (endpoint, member_id, p256dh, auth) values (${endpoint}, ${me.id}, ${p256dh}, ${auth})
+    on conflict (endpoint) do update set member_id = excluded.member_id, p256dh = excluded.p256dh, auth = excluded.auth`;
+  // keep the newest few per member
+  await sql`
+    delete from push_subscriptions where member_id = ${me.id} and endpoint not in (
+      select endpoint from push_subscriptions where member_id = ${me.id} order by created_at desc limit ${MAX_SUBS})`;
+  return c.json({ push: true }, 200, PRIVATE);
+});
+
+watchlist.delete('/me/push', async (c) => {
+  const me = requireMember(c);
+  await limit(c, 'write');
+  const endpoint = c.req.query('endpoint') ?? '';
+  await c.var.sql`delete from push_subscriptions where member_id = ${me.id} and endpoint = ${endpoint}`;
+  return c.json({ push: false }, 200, PRIVATE);
+});
+
 /** Mark every alert read. */
 watchlist.post('/me/alerts/read', async (c) => {
   const me = requireMember(c);

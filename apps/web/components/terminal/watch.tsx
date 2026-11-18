@@ -3,7 +3,8 @@
 // The watchlist UI: the star on a token page, the alerts bell in the header, and the /watchlist list.
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { Bell, Star } from '@phosphor-icons/react';
+import { Bell, BellRinging, Star } from '@phosphor-icons/react';
+import { usePush } from '@/lib/push';
 import { iconSrc } from './bits';
 import { usd } from '@/lib/format';
 import { SIDE_LABEL, useAlerts, useWatching, useWatchlist, type HiveAlert, type HiveSide } from '@/lib/watchlist';
@@ -26,6 +27,27 @@ function Icon({ url, symbol, size = 28 }: { url: string | null; symbol: string |
     <span className="grid shrink-0 place-items-center rounded-full bg-ink/[0.08] text-[11px] font-semibold" style={{ width: size, height: size }}>
       {(symbol ?? '?').slice(0, 1)}
     </span>
+  );
+}
+
+/** Turn browser notifications for hive alerts on or off (works with the site closed). */
+export function PushToggle({ compact = false }: { compact?: boolean }) {
+  const { state, enable, disable } = usePush();
+  if (state === 'unsupported') return compact ? null : <p className="text-xs text-muted">This browser can&apos;t show push notifications.</p>;
+  if (state === 'denied') return <p className="text-xs text-muted">Notifications are blocked for this site in your browser settings.</p>;
+  const on = state === 'on';
+  return (
+    <button
+      type="button"
+      disabled={state === 'busy'}
+      onClick={() => void (on ? disable() : enable())}
+      className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition disabled:opacity-60 ${
+        on ? 'border-[#3ddc97]/40 bg-[#3ddc97]/10 text-[#3ddc97]' : 'border-ink/[0.12] text-ink hover:border-ink/25'
+      }`}
+    >
+      <BellRinging size={14} weight={on ? 'fill' : 'regular'} />
+      {state === 'busy' ? 'One moment…' : on ? 'Browser alerts on' : 'Get alerts in this browser'}
+    </button>
   );
 }
 
@@ -116,6 +138,7 @@ export function AlertsBell() {
               ))}
             </ul>
           )}
+          <div className="border-t border-ink/[0.06] px-4 py-3"><PushToggle compact /></div>
         </div>
       )}
     </div>
@@ -133,6 +156,7 @@ export function WatchlistView() {
         Star tokens with <span className="text-ink">Watch</span> on their page. When the hive flips on one, from selling to buying (score {'≥'} +20) or
         back (score {'≤'} −20), you get an alert in the bell at the top. Checked every 5 minutes.
       </p>
+      {member && <div className="mt-4"><PushToggle /></div>}
       {!member ? (
         <p className="mt-10 rounded-2xl border border-ink/[0.06] bg-surface px-6 py-10 text-center text-sm text-muted">Sign in to keep a watchlist and get hive alerts.</p>
       ) : (
