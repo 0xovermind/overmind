@@ -6,6 +6,7 @@ import type { DexToken } from '@/lib/dexscreener';
 import { SocialLinks, TokenAvatar as Icon } from '@/components/terminal/bits';
 import { Art } from './art';
 import { HeroSphere } from './hero-sphere';
+import { OvhiveBar } from './ovhive-bar';
 import { MobileMenu, type NavLink } from './mobile-menu';
 import { Reveal } from './reveal';
 import { SectionHead, TG_URL, WRAP, X_URL } from './ui';
@@ -156,6 +157,7 @@ export function Hero() {
               <a href="#hive" className="pill-btn solid">See the hive →</a>
               <a href={appHref('/trenches')} className="ghost-link">Open terminal <span className="arrow">→</span></a>
             </div>
+            <OvhiveBar />
           </div>
           <div className="rise flex items-end justify-between gap-6 md:justify-end" style={{ animationDelay: '0.18s' }}>
             <p className="label flex items-center gap-2.5 text-ink">

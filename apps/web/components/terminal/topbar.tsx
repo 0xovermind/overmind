@@ -11,6 +11,7 @@ import { usd } from '@/lib/format';
 import { TokenAvatar, RiskDot } from './bits';
 import { AccountMenu } from './auth/account-menu';
 import { FeedbackButton } from './feedback';
+import { OVHIVE_CA, OVHIVE_TRADE_URL } from '@/lib/ovhive';
 
 const NAV = [
   { href: '/trenches', label: 'Markets' },
@@ -42,11 +43,46 @@ export function TopBar({ theme = 'dark' }: { theme?: 'dark' | 'light' }) {
       </nav>
       <Search />
       <div className="ml-auto flex items-center gap-2">
+        <OvhiveChip />
         <ThemeToggle initial={theme} />
         <FeedbackButton />
         <AccountMenu />
       </div>
     </header>
+  );
+}
+
+/** $OVHIVE in the header: its page here (chart, hive score), and a copy of the CA on the copy icon. */
+function OvhiveChip() {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="hidden items-center overflow-hidden rounded-lg border border-ink/[0.08] text-sm lg:flex">
+      <Link href={`/token/${OVHIVE_CA}`} className="flex items-center gap-1.5 px-2.5 py-1.5 transition hover:bg-ink/[0.05]" title="$OVHIVE on Overmind">
+        <span className="size-1.5 rounded-full bg-[#3ddc97]" />
+        <span className="ovhive-grad font-semibold">$OVHIVE</span>
+      </Link>
+      <button
+        type="button"
+        onClick={() => {
+          void navigator.clipboard?.writeText(OVHIVE_CA).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          });
+        }}
+        className="border-l border-ink/[0.08] px-2 py-1.5 font-mono text-xs text-muted transition hover:bg-ink/[0.05] hover:text-ink"
+        title={`Copy CA ${OVHIVE_CA}`}
+      >
+        {copied ? 'Copied' : 'CA'}
+      </button>
+      <a
+        href={OVHIVE_TRADE_URL}
+        target="_blank"
+        rel="noreferrer"
+        className="border-l border-ink/[0.08] px-2.5 py-1.5 text-xs font-semibold text-ink transition hover:bg-ink/[0.05]"
+      >
+        Trade ↗
+      </a>
+    </div>
   );
 }
 
