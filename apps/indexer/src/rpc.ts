@@ -28,12 +28,67 @@ const ORIGIN_MISSES = new Map<string, number>();
 const BLOCK_TIMES = new Map<bigint, number>();
 /** Up to this many distinct blocks are read exactly; more are interpolated between the two ends. */
 const EXACT_BLOCK_TIMES = 40;
+
+/**
+ * Shared pacing for every call this process makes to a plain (non-Alchemy) RPC. The public Robinhood
+ * Chain RPC answers 429 to bursts (about 5 calls a second gets through), and a flood of metadata and
+ * backfill calls starved the live poller for hours on 18 Nov. Each call (a batch counts per call) waits
+ * for a slot; the chain-following calls (logs, block number, block times) go ahead of everything else.
+ */
+// Each caller reserves its own slot and sleeps in its own request context (Workers can't wake one
+// request from another request's timer). Chain-following calls have their own lane and push the
+// background lane back; a background caller facing a backlog over BACKLOG_MS fails fast (its queue retries).
+const RPC_CALL_GAP_MS = 75;
+/**
+ * Background work (history backfill, metadata, hydration) is spaced wider than the live poller: a
+ * backfill's eth_getLogs over 25k-block ranges is heavy for the public RPC, and when it ran in the
+ * priority lane it slowed the live poller to 40-60s steps.
+ */
+const BACKGROUND_GAP_MS = 150;
+/** The history backfill gets its own, slowest lane behind everything else (logos and metadata first). */
+const BULK_GAP_MS = 250;
+const BACKLOG_MS = 90_000;
+let priorityNext = 0;
+let backgroundNext = 0;
+let bulkNext = 0;
+
+export type RpcLane = 'live' | 'background' | 'bulk';
+
+async function paced(body: unknown, lane: RpcLane = 'background'): Promise<void> {
+  const chainFollower = lane === 'live';
+  const calls = Array.isArray(body) ? (body as { method?: string }[]) : [body as { method?: string }];
+  const n = Math.max(1, calls.length);
+  const now = Date.now();
+  let at: number;
+  if (lane === 'live') {
+    at = Math.max(priorityNext, now);
+    priorityNext = at + n * RPC_CALL_GAP_MS;
+    backgroundNext = Math.max(backgroundNext, priorityNext);
+    bulkNext = Math.max(bulkNext, priorityNext);
+  } else if (lane === 'bulk') {
+    // Never more than a short wait: the backfill retries on its own, and a long sleep here would hold
+    // its Durable Object request open.
+    at = Math.max(bulkNext, backgroundNext, now);
+    if (at - now > BACKLOG_MS) throw new Error('RPC busy: bulk backlog');
+    bulkNext = at + n * BULK_GAP_MS;
+  } else {
+    at = Math.max(backgroundNext, now);
+    if (at - now > BACKLOG_MS) throw new Error('RPC busy: background backlog');
+    backgroundNext = at + n * BACKGROUND_GAP_MS;
+  }
+  if (at - now > 10_000) console.warn(`rpc pacing${chainFollower ? " [poller]" : ""}: waiting ${at - now}ms (${calls.length} calls, ${calls[0]?.method}) ${(new Error().stack ?? '').split('\n').slice(3, 7).map((s) => s.trim().replace(/^at (async )?/, '').replace(/\(file:.*src\//, '(')).join(' < ')}`);
+  if (at > now) await new Promise((r) => setTimeout(r, at - now));
+}
 /** The public RPC sometimes sends blockTimestamp "0x0": treat that as missing too. */
 const hasTime = (l: RawLog) => !!l.blockTimestamp && BigInt(l.blockTimestamp) !== 0n;
 
 export class Rpc {
   private id = 0;
-  constructor(private url: string) {}
+  private lane: RpcLane;
+  /** true / 'live': the live poller's own calls, ahead of everything. 'bulk': the history backfill, behind everything. */
+  constructor(private url: string, lane: boolean | RpcLane = false) {
+    this.lane = lane === true ? 'live' : lane === false ? 'background' : lane;
+  }
 
   async call<T>(method: string, params: unknown[], timeoutMs = 30_000, retries = 8): Promise<T> {
     const res = await this.post({ jsonrpc: '2.0', id: ++this.id, method, params }, timeoutMs, retries);
@@ -480,7 +535,9 @@ export class Rpc {
 
   private async post(body: unknown, timeoutMs = 30_000, retries = 8): Promise<Response> {
     const url = this.target(body);
+    const pace = !/alchemy.com/.test(url);
     for (let attempt = 0; ; attempt++) {
+      if (pace) await paced(body, this.lane);
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },

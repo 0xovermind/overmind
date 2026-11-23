@@ -77,7 +77,7 @@ export class Backfiller extends DurableObject<Env> {
   private init() {
     if (!this.pipeline) {
       this.sql = postgres(dbUrl(this.env), { max: 4, fetch_types: false, prepare: false });
-      this.rpc = new Rpc(this.env.RPC_URL);
+      this.rpc = new Rpc(this.env.RPC_URL, 'bulk');
       this.pipeline = new Pipeline(this.sql, this.rpc, { historical: true, anyAge: true });
     }
     return { sql: this.sql!, rpc: this.rpc!, pipeline: this.pipeline };

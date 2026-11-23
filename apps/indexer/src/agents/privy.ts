@@ -75,6 +75,8 @@ export async function verifyPrivyToken(token: string, appId: string, opts: { now
 export interface PrivyProfile {
   /** The Privy embedded Ethereum wallet (lowercase), the member's trading wallet. */
   wallet: string | null;
+  /** Every Ethereum wallet on the account (embedded and linked external ones, lowercase): Hive Pro holdings. */
+  wallets: string[];
   xUsername: string | null;
   xAvatarUrl: string | null;
 }
@@ -98,6 +100,9 @@ export function profileFromPrivyUser(user: { linked_accounts?: LinkedAccount[] }
   const x = accounts.find((a) => a.type === 'twitter_oauth');
   return {
     wallet: embedded?.address?.toLowerCase() ?? null,
+    wallets: [...new Set(accounts
+      .filter((a) => a.type === 'wallet' && a.chain_type === 'ethereum' && typeof a.address === 'string' && /^0x[0-9a-fA-F]{40}$/.test(a.address))
+      .map((a) => a.address!.toLowerCase()))],
     xUsername: x?.username ?? null,
     xAvatarUrl: x?.profile_picture_url ?? null,
   };

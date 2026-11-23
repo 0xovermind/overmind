@@ -7,6 +7,7 @@ import { ArrowSquareOut, Copy, Check } from '@phosphor-icons/react';
 import { API_URL } from '@/lib/api';
 import { short, usd } from '@/lib/format';
 import { iconSrc } from './bits';
+import { FollowWallet } from './watch';
 
 interface TokenRef { address: string; symbol: string | null; imageUrl: string | null }
 interface Trader {
@@ -60,6 +61,7 @@ function WalletCell({ w }: { w: string }) {
         {copied ? <Check size={13} /> : <Copy size={13} />}
       </button>
       <a href={`${EXPLORER}/address/${w}`} target="_blank" rel="noreferrer" className="text-muted hover:text-ink" aria-label="Explorer"><ArrowSquareOut size={13} /></a>
+      <FollowWallet wallet={w} />
     </span>
   );
 }

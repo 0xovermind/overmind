@@ -144,7 +144,7 @@ export function Hero() {
         <h1 className="display mt-10 text-[17vw] text-ink sm:text-[76px] md:text-[103px]">
           {['One mind.', 'Every', 'token.'].map((line, i) => (
             <span key={line} className="line-mask">
-              <span className="line-up" style={{ animationDelay: `${0.1 + i * 0.12}s` }}>{line}</span>
+              <span className={i === 2 ? 'line-up hero-grad' : 'line-up'} style={{ animationDelay: `${0.1 + i * 0.12}s` }}>{line}</span>
             </span>
           ))}
         </h1>

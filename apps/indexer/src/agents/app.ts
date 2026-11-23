@@ -9,6 +9,9 @@ import { leaderboard } from './board';
 import { agents } from './agents';
 import { media } from './media';
 import { watchlist } from './watchlist';
+import { pro } from './pro';
+import { wallets } from './wallets';
+import { explain } from './explain';
 import { LLMS_TXT } from '@overmind/agents/llms-txt';
 export { adminV1 } from './admin';
 
@@ -31,6 +34,9 @@ v1.route('/', leaderboard);
 v1.route('/', agents);
 v1.route('/', media);
 v1.route('/', watchlist);
+v1.route('/', pro);
+v1.route('/', wallets);
+v1.route('/', explain);
 
 /** The agent instructions, also at /llms.txt on the API and the website. */
 v1.get('/llms.txt', (c) => c.body(LLMS_TXT, 200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'public, max-age=300, s-maxage=300' }));

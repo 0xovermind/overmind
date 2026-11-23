@@ -197,6 +197,22 @@ body {
 /* ---- landing motion (all off under reduced motion) ---- */
 .line-mask { display: block; overflow: hidden; padding-bottom: 0.06em; margin-bottom: -0.06em; }
 .line-up { display: block; }
+/* The last hero line wears the hive gradient (the sphere's colours), drifting slowly. */
+.hero-grad {
+  background: linear-gradient(100deg, rgb(120,186,230), rgb(240,107,168) 45%, rgb(250,170,40) 80%, rgb(120,186,230));
+  background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  width: fit-content; padding-right: 0.06em;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero-grad { animation: line-up 0.9s cubic-bezier(0.16, 1, 0.3, 1) both, hero-grad-drift 9s ease-in-out 1s infinite alternate; }
+}
+/* Hive board gauges (landing): buying grows right in green, selling grows left in pink-red. */
+.gauge-buy { background: linear-gradient(90deg, #7fd9b0, #13a86b); }
+.gauge-sell { background: linear-gradient(270deg, #f59ab0, #e0344b); }
+.score-buy { color: #0f9a62; }
+.score-sell { color: #d42c45; }
+@keyframes hero-grad-drift { from { background-position: 0% 50%; } to { background-position: 100% 50%; } }
 .ring-breathe { transform: translate(-50%, -50%); }
 .orbit { transform: translate(-50%, -50%); }
 .ticker-track { will-change: transform; }

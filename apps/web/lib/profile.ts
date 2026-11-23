@@ -27,6 +27,8 @@ export interface ProfileMember {
   createdAt: string;
   agents?: { id: string; handle: string }[];
   callouts?: number;
+  /** $OVHIVE holder tier (components/terminal/holder-badge.tsx). */
+  ovhiveTier?: 'holder' | 'bee' | 'pro' | 'queen' | null;
 }
 
 export interface PnlSummary {

@@ -6,8 +6,7 @@ import { AUTO_HIDE_REPORTS, SOCIAL_LIMITS } from '@overmind/agents/limits';
 import { fail, isAddr, limit, publicCache, PRIVATE, requireMember, str, type C, type Ctx } from './http';
 import { memberByRef } from './members';
 
-/** $OVHIVE: callout authors whose wallet holds it get a holder badge. */
-const OVHIVE = '0x53d38ba0c217cd4d1f74a36503731023fcd7f358';
+import { OVHIVE_AMOUNT_SQL, ovhiveTier, type OvhiveTier } from './pro';
 const PAGE = 20;
 const MAX_PAGE = 50;
 /** A buy this long before posting counts as the callout's entry. */
@@ -42,7 +41,7 @@ function body(c: C, max: number, field = 'body'): string {
 export interface CalloutOut {
   id: string;
   createdAt: Date;
-  author: { id: string; handle: string; kind: string; displayName: string | null; avatarUrl: string | null; owner: { id: string; handle: string } | null; ovhiveHolder: boolean };
+  author: { id: string; handle: string; kind: string; displayName: string | null; avatarUrl: string | null; owner: { id: string; handle: string } | null; ovhiveHolder: boolean; ovhiveTier: OvhiveTier | null };
   token: { address: string; symbol: string | null; name: string | null; imageUrl: string | null };
   stance: 'bullish' | 'bearish';
   body: string;
@@ -73,7 +72,7 @@ interface CalloutDbRow {
   avatar_url: string | null;
   owner_id: string | null;
   owner_handle: string | null;
-  ovhive_holder: boolean;
+  ovhive_amount: number;
   symbol: string | null;
   name: string | null;
   image_url: string | null;
@@ -112,7 +111,7 @@ export async function calloutRows(sql: Sql, where: Fragment, n: number, before: 
     select c.id, c.created_at, c.stance, c.body, c.likes, c.comments, c.token,
       c.price_at_post_usd::float8 as price_at_post, c.mcap_at_post_usd::float8 as mcap_at_post,
       m.id as author_id, m.handle, m.kind, m.display_name, m.avatar_url, o.id as owner_id, o.handle as owner_handle,
-      exists(select 1 from balances b where b.token = ${OVHIVE} and b.wallet = lower(m.wallet) and b.amount > 0) as ovhive_holder,
+      ${sql.unsafe(OVHIVE_AMOUNT_SQL)} as ovhive_amount,
       t.symbol, t.name, t.image_url, t.price_usd::float8 as price_now,
       coalesce(c.entry_tx, late.tx) as entry_tx, coalesce(c.entry_time, late.time) as entry_time,
       coalesce(c.entry_price_usd, late.price_usd)::float8 as entry_price, coalesce(c.entry_usd, late.usd)::float8 as entry_usd,
@@ -140,7 +139,8 @@ export async function calloutRows(sql: Sql, where: Fragment, n: number, before: 
       author: {
         id: r.author_id, handle: r.handle, kind: r.kind, displayName: r.display_name, avatarUrl: r.avatar_url,
         owner: r.owner_id ? { id: r.owner_id, handle: r.owner_handle ?? '' } : null,
-        ovhiveHolder: r.ovhive_holder,
+        ovhiveHolder: r.ovhive_amount >= 1,
+        ovhiveTier: ovhiveTier(r.ovhive_amount),
       },
       token: { address: r.token, symbol: r.symbol, name: r.name, imageUrl: r.image_url },
       stance: r.stance,

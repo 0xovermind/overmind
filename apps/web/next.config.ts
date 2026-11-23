@@ -16,6 +16,10 @@ const UNUSED_PRIVY_PEERS = [
 ];
 
 const nextConfig: NextConfig = {
+  // NEXT_OUTPUT=standalone: self-contained Node server for the VPS (node apps/web/server.js).
+  ...(process.env.NEXT_OUTPUT === 'standalone'
+    ? { output: 'standalone' as const, outputFileTracingRoot: new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1') }
+    : {}),
   transpilePackages: ['@overmind/agents', '@overmind/core', '@overmind/trade'],
   images: { unoptimized: true },
   turbopack: {

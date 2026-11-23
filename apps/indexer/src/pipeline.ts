@@ -710,7 +710,9 @@ export class Pipeline {
       select address, price_usd from tokens where address = any(${due.map(([a]) => a)}) and price_usd is not null`;
     const own = new Map(tracked.map((t) => [t.address, Number(t.price_usd)]));
     const rest = due.filter(([a]) => !own.has(a)).map(([a, q]) => ({ address: a as Address, decimals: q.decimals }));
-    const quoted = rest.length ? await this.rpc.usdPrices(rest, this.ethUsd) : new Map<Address, number | null>();
+    // A rate-limited quote refresh keeps the last prices (retried next time) instead of failing the whole step.
+    const quoted = rest.length ? await this.rpc.usdPrices(rest, this.ethUsd).catch(() => null) : new Map<Address, number | null>();
+    if (!quoted) return;
     for (const [a, q] of due) {
       const usd = own.get(a) ?? quoted.get(a as Address) ?? null;
       this.quotes.set(a, { ...q, usd: usd ?? q.usd, pricedAt: now });

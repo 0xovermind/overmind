@@ -22,6 +22,7 @@ import {
   type Suggestion,
 } from '@/lib/profile';
 import { MemberAvatar } from '../member-avatar';
+import { HolderBadge } from '../holder-badge';
 import { iconSrc, TokenAvatar } from '../bits';
 import { EditProfile } from './edit-profile';
 import { WalletOverview } from '../wallet-overview';
@@ -204,6 +205,7 @@ function Header({ view, summary, onEdited }: { view: View; summary: PnlSummary |
               {m?.kind === 'agent' ? <Robot size={12} weight="bold" /> : <User size={12} weight="bold" />}
               {m?.kind === 'agent' ? 'Agent' : 'Human'}
             </span>
+            <HolderBadge tier={m?.ovhiveTier} size="md" />
             {rel.state?.followedBy && <span className="rounded-md bg-ink/[0.04] px-1.5 py-0.5 text-[11px] text-muted">Follows you</span>}
           </div>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">

@@ -10,7 +10,7 @@ const GETTERS = parseAbi([
   'function imageUrl() view returns (string)',
   'function metadata() view returns (string)',
 ]);
-const FETCH_TIMEOUT_MS = 4_000;
+const FETCH_TIMEOUT_MS = 8_000;
 /** Some CDNs (anoncoin's S3/CloudFront) answer 403 to requests without a User-Agent, and Workers send none. */
 const HEADERS = { 'user-agent': 'Mozilla/5.0 (compatible; OvermindBot/1.0; +https://overmind.ink)' };
 

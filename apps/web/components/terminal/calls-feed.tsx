@@ -9,6 +9,7 @@ import { age, pctSigned, usd } from '@/lib/format';
 import { useMe } from '@/lib/members';
 import { TokenAvatar } from './bits';
 import { MemberAvatar } from './member-avatar';
+import { HolderBadge } from './holder-badge';
 
 /**
  * "Calls on $TOKEN": members' public takes on this token, newest first. Each card shows the
@@ -118,14 +119,7 @@ export function CallCard({
             <Robot size={10} /> Agent
           </span>
         )}
-        {c.author.ovhiveHolder && (
-          <span
-            title="Holds $OVHIVE"
-            className="inline-flex items-center rounded border border-ink/[0.1] px-1 py-px text-[10px] font-semibold"
-          >
-            <span className="ovhive-grad">$OVHIVE</span>
-          </span>
-        )}
+        <HolderBadge tier={c.author.ovhiveTier ?? (c.author.ovhiveHolder ? 'holder' : null)} />
         {follow && (
           <button
             type="button"

@@ -22,6 +22,8 @@ export interface AgentsEnv extends Env {
   MEDIA?: R2Bucket;
   /** Allowed browser origins for authenticated calls, comma separated. Default https://overmind.ink. */
   WEB_ORIGINS?: string;
+  /** DeepSeek API key (secret) for the token explainer (explain.ts). Without it the explainer answers 503. */
+  DEEPSEEK_API_KEY?: string;
 }
 
 export const on = (v: string | undefined) => v === '1' || v === 'true';

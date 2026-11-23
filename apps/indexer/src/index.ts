@@ -26,6 +26,8 @@ export { TokenHydrator, RpcBudget } from './hydrator';
 import { hydrator } from './hydrator';
 import { applyLiftGraduations, liftGraduated, syncLiftProgress } from './liftfun';
 import { checkWatched } from './watch';
+import { checkWalletWatch } from './wallet-watch';
+import { detectHiveSignals } from './signals-hive';
 
 /** Follow-up delays for launch metadata that wasn't loadable on the first try. */
 const METADATA_RETRY_S = [10, 60, 300, 1800];
@@ -362,6 +364,56 @@ app.post('/admin/holders/backfill', async (c) => {
   return c.json({ queued: tokens.length });
 });
 
+// Re-read tokens' whole Transfer history from the chain and add what's missing (gaps left while the
+// indexer was down). Idempotent: transfers already stored are skipped, balances move only for new ones.
+// ?tokens=a,b and/or ?top=N (by 24h volume, max 100).
+app.post('/admin/transfers/resync', async (c) => {
+  const sql = postgres(dbUrl(c.env), { max: 2, fetch_types: false, prepare: false });
+  try {
+    let tokens = (c.req.query('tokens') ?? '').split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
+    const top = Math.min(Number(c.req.query('top') ?? 0), 100);
+    if (top > 0) {
+      const rows = await sql<{ address: string }[]>`select address from tokens order by volume_24h_usd desc nulls last limit ${top}`;
+      tokens = [...new Set([...tokens, ...rows.map((r) => r.address)])];
+    }
+    if (!tokens.length) return c.json({ error: 'tokens or top required' }, 400);
+    const rpc = new Rpc(c.env.RPC_URL, 'bulk');
+    const head = BigInt(await rpc.call<string>('eth_blockNumber', []));
+    const pipeline = new Pipeline(sql, rpc, { historical: true, anyAge: true });
+    const out: { token: string; added: number; holders: number | null; error?: string }[] = [];
+    for (const token of tokens) {
+      const [t] = await sql<{ created_block: string | null }[]>`select created_block::text from tokens where address = ${token}`;
+      if (!t?.created_block) {
+        out.push({ token, added: 0, holders: null, error: 'unknown token' });
+        continue;
+      }
+      try {
+        const added = await pipeline.backfillTransfers(token as `0x${string}`, BigInt(t.created_block) - 1n, head);
+        const [h] = await sql<{ holders: number }[]>`select holders from tokens where address = ${token}`;
+        out.push({ token, added, holders: h?.holders ?? null });
+      } catch (err) {
+        out.push({ token, added: 0, holders: null, error: String(err).slice(0, 200) });
+      }
+    }
+    return c.json({ head: head.toString(), tokens: out });
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+});
+
+// Dev: resolve one token's icon and socials right now (full launchpad read) and return what was found.
+app.post('/admin/metadata/token/:address', async (c) => {
+  const sql = postgres(dbUrl(c.env), { max: 1, fetch_types: false, prepare: false });
+  try {
+    const token = c.req.param('address').toLowerCase();
+    const r = await resolveMetadata(sql, new Rpc(c.env.RPC_URL), token, { dexOnly: false });
+    const [row] = await sql<{ image_url: string | null }[]>`select image_url from tokens where address = ${token}`;
+    return c.json({ ...r, image_url: row?.image_url ?? null });
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+});
+
 // Dev: resolve icon and socials for every token that hasn't been tried yet.
 app.post('/admin/metadata/all', async (c) => {
   const sql = postgres(dbUrl(c.env), { max: 1, fetch_types: false, prepare: false });
@@ -485,6 +537,18 @@ export default {
         await sql.end({ timeout: 5 });
       }
     }
+    // Every minute: followed wallets' new buys, sells and transfers become alerts (wallet-watch.ts).
+    {
+      const sql = postgres(dbUrl(env), { max: 1, fetch_types: false, prepare: false });
+      try {
+        const r = await checkWalletWatch(sql);
+        if (r.alerts) console.log(`wallet alerts: ${r.alerts} new on ${r.wallets} followed wallets`);
+      } catch (err) {
+        console.error('wallet alerts failed', err);
+      } finally {
+        await sql.end({ timeout: 5 });
+      }
+    }
     // Every 5 minutes: re-read the hive on starred tokens and alert watchers when a reading flips (watch.ts).
     if (minute % 5 === 4) {
       const sql = postgres(dbUrl(env), { max: 1, fetch_types: false, prepare: false });
@@ -493,6 +557,15 @@ export default {
         if (r.alerts) console.log(`hive alerts: ${r.flips} flips on ${r.tokens} watched tokens, ${r.alerts} alerts`);
       } catch (err) {
         console.error('hive alerts failed', err);
+      }
+      // Board-wide hive signals (Hive Pro feed, public after a delay).
+      try {
+        for (const scope of ['all', 'pons'] as const) {
+          const s = await detectHiveSignals(sql, scope);
+          if (s.signals) console.log(`hive signals [${scope}]: ${s.signals} new on ${s.tokens} board tokens`);
+        }
+      } catch (err) {
+        console.error('hive signals failed', err);
       } finally {
         await sql.end({ timeout: 5 });
       }

@@ -42,10 +42,10 @@ const verdict = (s: number) => (s >= 60 ? 'Buying' : s >= 20 ? 'Leaning in' : s 
 function Gauge({ score }: { score: number }) {
   const w = Math.min(50, Math.abs(score) / 2);
   return (
-    <div className="relative h-2 w-full bg-surface-2">
+    <div className="relative h-2 w-full overflow-hidden rounded-full bg-surface-2">
       <span className="absolute inset-y-0 left-1/2 w-px bg-ash" />
       <span
-        className="gauge-fill absolute inset-y-0 bg-ink"
+        className={`gauge-fill absolute inset-y-0 ${score >= 0 ? 'gauge-buy rounded-r-full' : 'gauge-sell rounded-l-full'}`}
         style={score >= 0 ? { left: '50%', width: `${w}%` } : { right: '50%', width: `${w}%` }}
       />
     </div>
@@ -103,7 +103,7 @@ export function HiveBoard({ hive }: { hive: Hive }) {
                 <Gauge score={r.score} />
                 <span className="label text-muted">{verdict(r.score)}</span>
               </span>
-              <span className="text-right font-mono text-[22px]">{r.score > 0 ? `+${r.score}` : r.score}</span>
+              <span className={`text-right font-mono text-[22px] ${r.score > 0 ? 'score-buy' : r.score < 0 ? 'score-sell' : ''}`}>{r.score > 0 ? `+${r.score}` : r.score}</span>
               <span className="hidden text-[13px] leading-snug text-muted md:block">
                 {r.smart_buyers} smart in · {r.smart_sellers} out
                 <br />

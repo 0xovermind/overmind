@@ -58,6 +58,8 @@ export interface AuthActions {
   /** Sign (never send) from the embedded wallet, UI off. Resolves with the serialized signed tx. */
   signTransaction(tx: SignTxRequest): Promise<`0x${string}`>;
   getAccessToken(): Promise<string | null>;
+  /** Link another external wallet to the account (Hive Pro counts $OVHIVE on every linked wallet). */
+  linkWallet(): void;
 }
 
 const APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID ?? '';
@@ -116,6 +118,7 @@ export const auth = {
     if (state.enabled && !actions) loaders.forEach((l) => l());
   },
   getAccessToken: () => (actions ? actions.getAccessToken() : Promise.resolve(null)),
+  linkWallet: () => actions?.linkWallet(),
 };
 
 export function useAuth(): AuthState {

@@ -39,7 +39,7 @@ export default function PrivyHost() {
 }
 
 function Bridge() {
-  const { ready, authenticated, user, login, logout, getAccessToken } = usePrivy();
+  const { ready, authenticated, user, login, logout, getAccessToken, linkWallet } = usePrivy();
   const { wallets } = useWallets();
   const { exportWallet } = useExportWallet();
   const { sendTransaction } = useSendTransaction();
@@ -104,9 +104,10 @@ function Bridge() {
         return signature;
       },
       getAccessToken,
+      linkWallet: () => linkWallet(),
     });
     return () => setAuthActions(null);
-  }, [login, logout, exportWallet, sendTransaction, signTransaction, getAccessToken, embedded]);
+  }, [login, logout, exportWallet, sendTransaction, signTransaction, getAccessToken, linkWallet, embedded]);
 
   return null;
 }

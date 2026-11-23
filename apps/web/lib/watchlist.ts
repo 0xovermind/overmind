@@ -15,6 +15,7 @@ export interface WatchItem {
 
 export interface HiveAlert {
   id: string;
+  kind?: 'hive';
   token: { address: string; symbol: string | null; imageUrl: string | null };
   side: 'buying' | 'selling';
   score: number | null;
@@ -22,6 +23,24 @@ export interface HiveAlert {
   createdAt: string;
   read: boolean;
 }
+
+/** A followed wallet bought, sold, sent or received a token (Hive Pro, lib/wallets.ts). */
+export interface WalletAlert {
+  id: string;
+  kind: 'wallet';
+  token: { address: string; symbol: string | null; imageUrl: string | null };
+  wallet: { address: string; label: string | null };
+  action: 'buy' | 'sell' | 'in' | 'out';
+  amount: number;
+  usd: number | null;
+  counterparty: string | null;
+  tx: string;
+  at: string;
+  createdAt: string;
+  read: boolean;
+}
+
+export type AnyAlert = HiveAlert | WalletAlert;
 
 /** Fired after a star changes, so the watchlist page and other stars refresh. */
 const WATCH_CHANGED = 'overmind:watch-changed';
@@ -114,13 +133,13 @@ export function useWatchlist() {
 /** My hive alerts, polled every minute, with mark-all-read. */
 export function useAlerts() {
   const member = useIsMember();
-  const [items, setItems] = useState<HiveAlert[]>([]);
+  const [items, setItems] = useState<AnyAlert[]>([]);
   const [unread, setUnread] = useState(0);
   const load = useCallback(async () => {
     try {
       const r = await fetch(`${V1}/me/alerts`, { headers: await authHeaders() });
       if (!r.ok) return;
-      const j = (await r.json()) as { items: HiveAlert[]; unread: number };
+      const j = (await r.json()) as { items: AnyAlert[]; unread: number };
       setItems(j.items);
       setUnread(j.unread);
     } catch {

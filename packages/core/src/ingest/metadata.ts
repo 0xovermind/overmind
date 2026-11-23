@@ -161,7 +161,8 @@ function fromJson(j: Record<string, unknown>): Partial<TokenLinks> & { links: st
     else if (v && typeof v === 'object') for (const x of Object.values(v)) links.push(str(x) ?? '');
   }
   return {
-    image: str(j.image) ?? str(j.image_uri) ?? str(j.imageUrl) ?? str(j.logo) ?? str(j.icon) ?? str(ext.image),
+    // image_hash: j7tracker-deployed tokens put their logo there (an ipfs:// URI).
+    image: str(j.image) ?? str(j.image_uri) ?? str(j.imageUrl) ?? str(j.image_hash) ?? str(j.imageHash) ?? str(j.logo) ?? str(j.icon) ?? str(ext.image),
     website: str(j.website) ?? str(ext.website) ?? str(j.external_url) ?? str(j.url),
     twitter: str(j.twitter) ?? str(j.x) ?? str(ext.twitter) ?? str(ext.x),
     telegram: str(j.telegram) ?? str(ext.telegram),

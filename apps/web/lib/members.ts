@@ -25,6 +25,8 @@ export interface Member {
   followers: number;
   following: number;
   createdAt: string;
+  /** $OVHIVE holder tier (public profile reads only). */
+  ovhiveTier?: 'holder' | 'bee' | 'pro' | 'queen' | null;
 }
 
 export interface ApiError {

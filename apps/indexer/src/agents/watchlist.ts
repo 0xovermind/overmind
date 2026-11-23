@@ -84,9 +84,11 @@ watchlist.get('/me/alerts', async (c) => {
     where a.member_id = ${me.id}
     order by a.created_at desc limit ${ALERTS_PAGE}`;
   const [unreadRow] = await sql<{ unread: number }[]>`
-    select count(*)::int as unread from hive_alerts where member_id = ${me.id} and read_at is null`;
-  const items = rows.map((r) => ({
+    select (select count(*) from hive_alerts where member_id = ${me.id} and read_at is null)::int
+         + (select count(*) from wallet_alerts where member_id = ${me.id} and read_at is null)::int as unread`;
+  const hive = rows.map((r) => ({
     id: r.id,
+    kind: 'hive' as const,
     token: { address: r.token, symbol: r.symbol, imageUrl: r.image_url },
     side: r.side,
     score: r.score,
@@ -94,6 +96,35 @@ watchlist.get('/me/alerts', async (c) => {
     createdAt: r.created_at,
     read: !!r.read_at,
   }));
+  // Followed-wallet alerts (wallet-watch.ts), merged in by time.
+  const wrows = await sql<{
+    id: string; wallet: string; label: string | null; kind: string; token: string; amount: string; decimals: number | null; usd: number | null;
+    counterparty: string | null; tx: string; at: Date; created_at: Date; read_at: Date | null; symbol: string | null; image_url: string | null;
+  }[]>`
+    select a.id, a.wallet, w.label, a.kind, a.token, a.amount::text as amount, t.decimals, a.usd::float8 as usd, a.counterparty, a.tx, a.at,
+      a.created_at, a.read_at, t.symbol, t.image_url
+    from wallet_alerts a
+    left join tokens t on t.address = a.token
+    left join wallet_watch w on w.member_id = a.member_id and w.wallet = a.wallet
+    where a.member_id = ${me.id}
+    order by a.created_at desc limit ${ALERTS_PAGE}`;
+  const wallet = wrows.map((r) => ({
+    id: r.id,
+    kind: 'wallet' as const,
+    token: { address: r.token, symbol: r.symbol, imageUrl: r.image_url },
+    wallet: { address: r.wallet, label: r.label },
+    action: r.kind,
+    amount: Number(BigInt(r.amount) / 10n ** BigInt(Math.max((r.decimals ?? 18) - 6, 0))) / 1e6,
+    usd: r.usd,
+    counterparty: r.counterparty,
+    tx: r.tx,
+    at: r.at,
+    createdAt: r.created_at,
+    read: !!r.read_at,
+  }));
+  const items = [...hive, ...wallet]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, ALERTS_PAGE);
   return c.json({ items, unread: unreadRow?.unread ?? 0 }, 200, PRIVATE);
 });
 
@@ -137,5 +168,6 @@ watchlist.post('/me/alerts/read', async (c) => {
   const me = requireMember(c);
   await limit(c, 'write');
   await c.var.sql`update hive_alerts set read_at = now() where member_id = ${me.id} and read_at is null`;
+  await c.var.sql`update wallet_alerts set read_at = now() where member_id = ${me.id} and read_at is null`;
   return c.json({ unread: 0 }, 200, PRIVATE);
 });

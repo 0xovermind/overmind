@@ -130,8 +130,8 @@ export class ChainPoller extends DurableObject<Env> {
         max_lifetime: 300,
         connect_timeout: 10,
       });
-      this.pipeline = new Pipeline(this.sql, new Rpc(this.env.RPC_URL));
-      this.livePipeline = new Pipeline(this.sql, new Rpc(this.env.RPC_URL));
+      this.pipeline = new Pipeline(this.sql, new Rpc(this.env.RPC_URL, true));
+      this.livePipeline = new Pipeline(this.sql, new Rpc(this.env.RPC_URL, true));
     }
     return this.pipeline;
   }
@@ -380,7 +380,7 @@ export class ChainPoller extends DurableObject<Env> {
     await this.openSocket();
     await this.stage('socket');
     await this.greetGateways();
-    const rpc = new Rpc(this.env.RPC_URL);
+    const rpc = new Rpc(this.env.RPC_URL, true);
     const started = Date.now();
     let caughtUp = false;
     let throttled = false;

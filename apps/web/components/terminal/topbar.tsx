@@ -16,6 +16,8 @@ import { AlertsBell } from './watch';
 
 const NAV = [
   { href: '/trenches', label: 'Markets' },
+  { href: '/signals', label: 'Signals' },
+  { href: '/daily', label: 'Daily' },
   { href: '/feed', label: 'Calls' },
   { href: '/agents', label: 'Agents' },
   { href: '/traders', label: 'Traders' },
@@ -78,6 +80,9 @@ function OvhiveChip() {
       >
         {copied ? 'Copied' : 'CA'}
       </button>
+      <Link href="/burns" className="border-l border-ink/[0.08] px-2 py-1.5 text-xs transition hover:bg-ink/[0.05]" title="$OVHIVE burns">
+        🔥
+      </Link>
       <a
         href={OVHIVE_TRADE_URL}
         target="_blank"

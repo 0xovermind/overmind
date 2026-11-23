@@ -15,7 +15,9 @@ import { refreshSignalsIfStale } from './signals-refresh';
 import { page, repairBalances, walletHoldings, walletPosition } from './wallets';
 import { PAUSED_BODY, readPause } from './pause';
 import { TRANSPARENCY_CACHE_S, transparency } from './transparency';
-import { hiveBoard, hiveToken, smartTraders } from './hive';
+import { asScope, hiveBoard, hiveDaily, hiveHistory, hiveToken, smartTraders } from './hive';
+import { hiveSignals, pendingSignals, PUBLIC_DELAY } from './signals-hive';
+import { BurnsNotReady, ovhiveBurns } from './burns';
 
 type Ctx = { Bindings: Env; Variables: { sql: Sql } };
 
@@ -155,6 +157,62 @@ api.get('/tokens/:address/holders', async (c) => {
   return c.json({ holders, total: snapshot.holderCount }, 200, cache(5));
 });
 
+/**
+ * Holder count over time: the token's transfers replayed in chain order, sampled every hour (the
+ * last point is now). Burn and zero addresses don't count as holders. Small tokens only (≤ 50k transfers).
+ */
+const holderSeriesCache = new Map<string, { at: number; body: unknown }>();
+api.get('/tokens/:address/holders/history', async (c) => {
+  const sql = c.var.sql;
+  const token = addr(c.req.param('address'));
+  const hit = holderSeriesCache.get(token);
+  if (hit && Date.now() - hit.at < 60_000) return c.json(hit.body, 200, cache(60));
+  const [n] = await sql<{ n: number }[]>`select count(*)::int as n from transfers where token = ${token}`;
+  if (!n?.n) return c.json({ points: [], now: 0, change24h: 0 }, 200, cache(60));
+  if (n.n > 50_000) return c.json({ error: 'too many transfers' }, 400);
+  const rows = await sql<{ from: string; to: string; amount: string; time: Date }[]>`
+    select "from", "to", amount::text as amount, time from transfers where token = ${token} order by block, log_index`;
+  const skip = new Set(['0x0000000000000000000000000000000000000000', '0x000000000000000000000000000000000000dead']);
+  const bal = new Map<string, bigint>();
+  let count = 0;
+  const move = (w: string, d: bigint) => {
+    if (skip.has(w)) return;
+    const before = bal.get(w) ?? 0n;
+    const after = before + d;
+    bal.set(w, after);
+    if (before <= 0n && after > 0n) count++;
+    else if (before > 0n && after <= 0n) count--;
+  };
+  const HOUR = 3_600_000;
+  const points: { t: string; holders: number }[] = [];
+  // Some backfilled transfers carry no timestamp (epoch 0): they take the previous transfer's time.
+  const first = rows.find((r) => r.time.getTime() > 1_600_000_000_000);
+  if (!first) return c.json({ points: [], now: 0, change24h: 0 }, 200, cache(60));
+  let bucket = Math.floor(first.time.getTime() / HOUR) * HOUR;
+  let last = first.time.getTime();
+  for (const r of rows) {
+    const t = Math.max(r.time.getTime(), last);
+    last = t;
+    while (t >= bucket + HOUR) {
+      points.push({ t: new Date(bucket + HOUR).toISOString(), holders: count });
+      bucket += HOUR;
+    }
+    const v = BigInt(r.amount);
+    move(r.from, -v);
+    move(r.to, v);
+  }
+  const now = Date.now();
+  while (bucket + HOUR < now) {
+    points.push({ t: new Date(bucket + HOUR).toISOString(), holders: count });
+    bucket += HOUR;
+  }
+  points.push({ t: new Date(now).toISOString(), holders: count });
+  const dayAgo = [...points].reverse().find((p) => Date.parse(p.t) <= now - 24 * HOUR);
+  const body = { points, now: count, change24h: dayAgo ? count - dayAgo.holders : count };
+  holderSeriesCache.set(token, { at: Date.now(), body });
+  return c.json(body, 200, cache(60));
+});
+
 /** OHLCV. 1m is stored (5m/15m/1h/4h aggregated from it); 1s/15s/30s come from trades (last 24h). */
 api.get('/tokens/:address/candles', async (c) => {
   const token = addr(c.req.param('address'));
@@ -277,7 +335,27 @@ api.get('/transparency', async (c) => c.json(
     200, cache(TRANSPARENCY_CACHE_S)));
 
 /** Overmind Consensus: the hive board, and one token's view (see hive.ts). */
-api.get('/hive', async (c) => c.json(await hiveBoard(c.var.sql, Math.min(Number(c.req.query('limit') ?? 30), 60)), 200, cache(20)));
+api.get('/hive', async (c) => c.json(await hiveBoard(c.var.sql, Math.min(Number(c.req.query('limit') ?? 30), 60), asScope(c.req.query('scope'))), 200, cache(20)));
+/** $OVHIVE burns: every transfer to the dead or zero address, with the running total (burns.ts). */
+api.get('/ovhive/burns', async (c) => {
+  try {
+    return c.json(await ovhiveBurns(c.env.RPC_URL), 200, cache(60));
+  } catch (err) {
+    if (err instanceof BurnsNotReady) return c.json({ error: 'not ready' }, 503, { 'cache-control': 'no-store' });
+    throw err;
+  }
+});
+/** Hive Daily: the smart set's biggest net buys and sells over the last 24h (board-clean tokens only). */
+api.get('/hive/daily', async (c) => c.json(await hiveDaily(c.var.sql, Number(c.req.query('limit') ?? 5), asScope(c.req.query('scope'))), 200, cache(300)));
+/** Hive signals (flips of the smart crowd's side), delayed for the public; real time is /v1/hive/signals (Hive Pro). */
+api.get('/hive/signals', async (c) =>
+  {
+  const scope = asScope(c.req.query('scope'));
+  return c.json({ delayed: true, delay: PUBLIC_DELAY, scope, pending: await pendingSignals(c.var.sql, scope), signals: await hiveSignals(c.var.sql, { delayed: true, scope }) }, 200, cache(30));
+});
+/** A token's hive reading over the last day (smart-wallet flow, rebuilt from swaps). Longer ranges are Hive Pro: /v1/hive/:address/history. */
+api.get('/hive/:address/history', async (c) =>
+  c.json({ points: await hiveHistory(c.var.sql, addr(c.req.param('address')), 1) }, 200, cache(60)));
 api.get('/hive/:address', async (c) => c.json({ consensus: await hiveToken(c.var.sql, addr(c.req.param('address'))) }, 200, cache(20)));
 /** The top traders: the smart set with each wallet's best token and current holdings (see hive.ts). */
 api.get('/traders', async (c) => c.json(await smartTraders(c.var.sql, Math.min(Number(c.req.query('limit') ?? 100) || 100, 300)), 200, cache(60)));

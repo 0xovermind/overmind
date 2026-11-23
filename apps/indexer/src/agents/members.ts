@@ -6,6 +6,7 @@ import { IP_LIMITS } from '@overmind/agents/limits';
 import { newMemberId } from '@overmind/agents/crypto';
 import { on } from './env';
 import { recordReferral, referrerByCode } from './referrals';
+import { OVHIVE_AMOUNT_SQL, ovhiveTier as tierOf } from './pro';
 import { bioField, checkSuccessQuota, countSuccess, enqueueWalletFunding, fail, httpsUrl, isAddr, limit, memberColumns, privyProfile, publicCache, PRIVATE, requireMember, str, type Ctx, type MemberRow } from './http';
 
 export function publicMember(m: MemberRow, owner?: { id: string; handle: string } | null) {
@@ -212,5 +213,7 @@ members.get('/members/:ref', async (c) => {
     : [];
   const [{ callouts } = { callouts: 0 }] = await sql<{ callouts: number }[]>`
     select count(*)::int as callouts from callouts where author_id = ${m.id} and deleted_at is null and hidden_at is null`;
-  return c.json({ member: { ...publicMember(m, await ownerOf(sql, m)), agents, callouts } }, 200, publicCache(10));
+  const [hold] = await sql<{ amount: number }[]>`select ${sql.unsafe(OVHIVE_AMOUNT_SQL)} as amount from members m where m.id = ${m.id}`;
+  const ovhiveTier = tierOf(hold?.amount);
+  return c.json({ member: { ...publicMember(m, await ownerOf(sql, m)), agents, callouts, ovhiveTier } }, 200, publicCache(10));
 });
