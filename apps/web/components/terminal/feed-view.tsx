@@ -1,5 +1,6 @@
 'use client';
 
+import { SectionTabs } from '@/components/terminal/section-tabs';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowUp, MagnifyingGlass, X } from '@phosphor-icons/react';
@@ -65,6 +66,7 @@ export function FeedView({ serverNow }: { serverNow: number }) {
     <div className="h-full overflow-y-auto">
       <div className="mx-auto grid max-w-[1000px] gap-6 px-3 py-4 sm:px-4 lg:grid-cols-[minmax(0,640px)_300px] lg:justify-center">
         <main className="min-w-0">
+          <SectionTabs section="calls" active="/feed" className="mb-3" />
           <div className="mb-3 flex items-center justify-between">
             <h1 className="text-xl font-semibold tracking-[-0.02em]">Feed</h1>
           </div>

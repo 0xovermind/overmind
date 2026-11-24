@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { SectionTabs } from '@/components/terminal/section-tabs';
 import Link from 'next/link';
 import { appShare } from '@/lib/share';
 import { asScope, dailyDate, getDaily, mcap, signedUsd, type DailyRow, type Scope } from '@/lib/daily';
@@ -71,6 +72,7 @@ export default async function DailyPage({ searchParams }: { searchParams: Promis
       <div className="mx-auto max-w-[1000px] px-3 pb-16 pt-6 sm:px-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
+            <SectionTabs section="signals" active="/daily" className="mb-3" />
             <p className="font-mono text-xs uppercase tracking-[0.12em] text-muted">Hive Daily · last 24h{d ? ` · ${dailyDate(d.at)}` : ''}</p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight">What the profitable wallets did today</h1>
             <p className="mt-1 max-w-[62ch] text-sm text-muted">

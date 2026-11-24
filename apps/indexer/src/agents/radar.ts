@@ -247,3 +247,42 @@ radar.get('/season', async (c) => {
 });
 
 export { fail };
+
+// ---------------------------------------------------------------- Galaxy
+
+/**
+ * GET /v1/hive/galaxy?scope=pons|all: the tokens the smart wallets traded most in the last 24 hours, each with
+ * the smart wallets around it and their net dollars (in > 0: buying, < 0: selling). Cached 2 minutes.
+ */
+const galaxyCache = new Map<string, { at: number; body: unknown }>();
+radar.get('/hive/galaxy', async (c) => {
+  await limit(c, 'read');
+  const scope = c.req.query('scope') === 'all' ? 'all' : 'pons';
+  const hit = galaxyCache.get(scope);
+  if (hit && Date.now() - hit.at < 120_000) return c.json(hit.body, 200, publicCache(60));
+  const rows = await c.var.sql<{ token: string; trader: string; net: number; trades: number }[]>`
+    select s.token, s.trader,
+      coalesce(sum(case when s.side = 'buy' then s.usd else -s.usd end), 0)::float8 as net, count(*)::int as trades
+    from swaps s join smart_set w on w.wallet = s.trader and w.scope = ${scope}
+    where s.time > now() - interval '24 hours'
+    group by s.token, s.trader`;
+  const byToken = new Map<string, { trader: string; net: number; trades: number }[]>();
+  for (const r of rows) (byToken.get(r.token) ?? byToken.set(r.token, []).get(r.token)!).push(r);
+  const top = [...byToken.entries()].sort((a, b) => b[1].length - a[1].length).slice(0, 9);
+  const meta = top.length
+    ? await c.var.sql<{ address: string; symbol: string; image_url: string | null; market_cap_usd: number | null }[]>`
+        select address, symbol, image_url, market_cap_usd::float8 as market_cap_usd from tokens where address = any(${top.map(([t]) => t)}::text[])`
+    : [];
+  const m = new Map(meta.map((x) => [x.address, x]));
+  const body = {
+    scope,
+    tokens: top.map(([t, ws]) => ({
+      token: t, symbol: m.get(t)?.symbol ?? '?', imageUrl: m.get(t)?.image_url ?? null, mcap: m.get(t)?.market_cap_usd ?? null,
+      buyers: ws.filter((w) => w.net > 0).length, sellers: ws.filter((w) => w.net < 0).length,
+      net: ws.reduce((s, w) => s + w.net, 0),
+      wallets: ws.sort((a, b) => Math.abs(b.net) - Math.abs(a.net)).slice(0, 40).map((w) => ({ wallet: w.trader, net: w.net, trades: w.trades })),
+    })),
+  };
+  galaxyCache.set(scope, { at: Date.now(), body });
+  return c.json(body, 200, publicCache(60));
+});

@@ -1,5 +1,6 @@
 'use client';
 
+import { SectionTabs } from '@/components/terminal/section-tabs';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Robot, Trophy, User } from '@phosphor-icons/react';
@@ -111,6 +112,7 @@ function SeasonHeader({ season }: { season: Season | null }) {
   return (
     <header className="flex flex-wrap items-end justify-between gap-4">
       <div>
+        <SectionTabs section="calls" active="/leaderboard" className="mb-3" />
         <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-[-0.02em]">
           <Trophy size={22} weight="fill" className="text-brand" /> {season?.name ?? 'Season 0'}
         </h1>

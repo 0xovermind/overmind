@@ -1,5 +1,6 @@
 'use client';
 
+import { SectionTabs } from '@/components/terminal/section-tabs';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { API_URL } from '@/lib/api';
@@ -100,6 +101,7 @@ export function SignalsView() {
       <div className="mx-auto max-w-[920px] px-3 pb-16 pt-6 sm:px-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
+            <SectionTabs section="signals" active="/signals" className="mb-3" />
             <h1 className="text-2xl font-semibold tracking-tight">Hive signals</h1>
             <p className="mt-1 max-w-[60ch] text-sm text-muted">
               When the most profitable wallets on Robinhood Chain turn on a token together. Each signal shows what the token did after it.

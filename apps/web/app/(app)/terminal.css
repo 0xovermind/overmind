@@ -346,3 +346,15 @@
   .dna-orb { animation: dna-glow 5s ease-in-out infinite; }
   .bubble-in { animation: bubble-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
 }
+
+/* The hive views (hive-views.tsx). */
+@keyframes hex-in { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: none; } }
+@keyframes radar-turn { to { transform: rotate(360deg); } }
+@keyframes swipe-in { from { opacity: 0; transform: translateY(24px) scale(0.97); } to { opacity: 1; transform: none; } }
+.hex-cell polygon:first-child { transition: filter 0.2s; }
+.hex-cell:hover polygon:first-child { filter: brightness(1.25) drop-shadow(0 0 10px rgb(255 255 255 / 0.25)); }
+@media (prefers-reduced-motion: no-preference) {
+  .hex-cell { transform-box: fill-box; transform-origin: center; animation: hex-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .radar-sweep { animation: radar-turn 8s linear infinite; }
+  .swipe-card { animation: swipe-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+}

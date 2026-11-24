@@ -1,6 +1,7 @@
 'use client';
 
 // The /traders page: the hive's smart wallets, ranked by realized profit on what they bought.
+import { SectionTabs } from '@/components/terminal/section-tabs';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ArrowSquareOut, Copy, Check } from '@phosphor-icons/react';
@@ -88,6 +89,7 @@ export function TradersView() {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8">
+      <SectionTabs section="traders" active="/traders" className="mb-3" />
       <h1 className="text-2xl font-semibold tracking-[-0.02em]">Top traders</h1>
       <p className="mt-1 max-w-[70ch] text-sm text-muted">
         The most profitable wallets on Robinhood Chain, counting only tokens they actually bought. Bots, launch snipers, and devs or teams selling

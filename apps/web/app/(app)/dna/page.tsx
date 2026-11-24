@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { SectionTabs } from '@/components/terminal/section-tabs';
 import { appShare } from '@/lib/share';
 import { DnaSearch } from '@/components/terminal/dna-bits';
 
@@ -26,6 +27,7 @@ export default function DnaIndex() {
     <div className="h-full overflow-y-auto">
       <main className="relative mx-auto w-full max-w-3xl px-4 pb-16 pt-10">
       <div className="dna-orb pointer-events-none absolute left-1/2 top-0 -z-10 size-[420px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(240,107,168,0.22),transparent_65%)] blur-2xl" />
+      <SectionTabs section="traders" active="/dna" className="mx-auto mb-6" />
       <div className="text-center">
         <div className="font-mono text-xs uppercase tracking-[0.14em] text-muted">Wallet DNA</div>
         <h1 className="mt-2 text-4xl font-extrabold tracking-tight sm:text-5xl">What kind of trader is this wallet?</h1>

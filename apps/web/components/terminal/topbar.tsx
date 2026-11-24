@@ -14,18 +14,14 @@ import { FeedbackButton } from './feedback';
 import { OVHIVE_CA, OVHIVE_TRADE_URL } from '@/lib/ovhive';
 import { AlertsBell } from './watch';
 
-const NAV: { href: string; label: string; wide?: boolean }[] = [
+const NAV: { href: string; label: string; match?: string[] }[] = [
   { href: '/trenches', label: 'Markets' },
-  { href: '/signals', label: 'Signals' },
-  { href: '/radar', label: 'Radar' },
-  { href: '/arena', label: 'Arena' },
-  { href: '/daily', label: 'Daily' },
-  { href: '/feed', label: 'Calls' },
-  { href: '/agents', label: 'Agents', wide: true },
-  { href: '/traders', label: 'Traders' },
-  { href: '/dna', label: 'DNA' },
-  { href: '/leaderboard', label: 'Ranks', wide: true },
-  { href: '/watchlist', label: 'Watchlist' },
+  { href: '/hive', label: 'Hive', match: ['/swipe'] },
+  { href: '/signals', label: 'Signals', match: ['/daily'] },
+  { href: '/radar', label: 'Launches' },
+  { href: '/arena', label: 'Arena', match: ['/portfolio', '/season'] },
+  { href: '/feed', label: 'Calls', match: ['/agents', '/leaderboard'] },
+  { href: '/traders', label: 'Traders', match: ['/dna'] },
 ];
 
 export function TopBar({ theme = 'dark' }: { theme?: 'dark' | 'light' }) {
@@ -43,7 +39,7 @@ export function TopBar({ theme = 'dark' }: { theme?: 'dark' | 'light' }) {
           <Link
             key={n.label}
             href={n.href}
-            className={`nav-pill relative rounded-lg px-2.5 py-1.5 transition ${n.wide ? 'hidden xl:block ' : ''}${path.startsWith(n.href) ? 'is-active bg-ink/[0.07] text-ink' : 'text-muted hover:text-ink'}`}
+            className={`nav-pill relative rounded-lg px-2.5 py-1.5 transition ${[n.href, ...(n.match ?? [])].some((h) => path.startsWith(h)) ? 'is-active bg-ink/[0.07] text-ink' : 'text-muted hover:text-ink'}`}
           >
             {n.label}
           </Link>

@@ -1,5 +1,6 @@
 'use client';
 
+import { SectionTabs } from '@/components/terminal/section-tabs';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowSquareOut, Check, Copy, FileText, GithubLogo, Key, ShieldCheck, Wallet } from '@phosphor-icons/react';
@@ -63,6 +64,7 @@ function BringYourAgent() {
   };
   return (
     <section aria-labelledby="bring">
+      <SectionTabs section="calls" active="/agents" className="mb-3" />
       <div className="rounded-2xl border border-ink/[0.08] bg-surface p-4 md:p-5">
         <h1 id="bring" className="text-2xl font-semibold tracking-[-0.02em]">
           Bring your agent
