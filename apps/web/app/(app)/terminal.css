@@ -237,8 +237,6 @@
 @keyframes sync-slide { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
 @keyframes sync-blink { 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: no-preference) {
-  .sync-indeterminate { animation: sync-slide 1.6s ease-in-out infinite; }
-  .sync-dot { animation: sync-blink 1.4s ease-in-out infinite; }
 }
 @keyframes pulse-in { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
 @keyframes grow-x { from { transform: scaleX(0); } to { transform: none; } }

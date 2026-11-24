@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { API_URL } from '@/lib/api';
 
-/** Below this many blocks behind the head, the indexer counts as live and the banner hides. */
-const LIVE_LAG = 3000;
+/** Below this many blocks behind the head (~30 min of chain), the banner stays hidden. */
+const LIVE_LAG = 18000;
 const POLL_MS = 20_000;
 
 interface Sample { lag: number; at: number }
@@ -76,7 +76,7 @@ export function SyncBanner() {
         <span className="ml-auto text-[12px] text-muted">Scores and feeds fill in as it catches up</span>
       </div>
       <div className="mt-2 h-1 overflow-hidden rounded-full bg-ink/10">
-        <div className={pct > 0 ? 'sync-fill h-full rounded-full' : 'sync-fill sync-indeterminate h-full w-1/3 rounded-full'} style={pct > 0 ? { width: `${pct}%` } : undefined} />
+        <div className='sync-fill h-full rounded-full' style={{ width: `${Math.max(pct, 2)}%` }} />
       </div>
     </div>
   );
