@@ -202,12 +202,21 @@
 .terminal-ui button:not(:disabled):active, .terminal-ui a.pro-buy:active, .terminal-ui [role='button']:active { transform: scale(0.96); transition-duration: 0.06s; }
 .terminal-ui .signal-row:active, .terminal-ui .trench-row > .group:active { transform: scale(0.995); }
 .terminal-ui :focus-visible { outline: 2px solid rgb(240 107 168 / 0.6); outline-offset: 2px; border-radius: 6px; }
+/* Panels light up a little under the pointer. */
+.terminal-ui .rounded-2xl.bg-surface { transition: border-color 0.3s, box-shadow 0.3s; }
+.terminal-ui .rounded-2xl.bg-surface:hover { border-color: rgb(255 255 255 / 0.11); box-shadow: 0 18px 40px -26px rgb(240 107 168 / 0.35); }
+.terminal-ui[data-theme='light'] .rounded-2xl.bg-surface:hover { border-color: rgb(0 0 0 / 0.12); }
+/* Gradient buttons drift and glow on hover. */
+.pro-buy { background-size: 180% 100%; background-position: 0 0; transition: background-position 0.5s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s, transform 0.16s; }
+.pro-buy:hover { background-position: 100% 0; box-shadow: 0 6px 22px -8px rgb(240 107 168 / 0.7); }
+@keyframes underline-in { from { transform: scaleX(0); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes route-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @keyframes row-in { from { opacity: 0; transform: translateY(-6px); background-color: rgb(240 107 168 / 0.08); } to { opacity: 1; transform: none; } }
 @keyframes skel { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
 @media (prefers-reduced-motion: no-preference) {
   .route-in { animation: route-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both; }
   .row-in { animation: row-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .nav-pill.is-active::after { animation: underline-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
   .skel { animation: skel 1.3s ease-in-out infinite; }
   .terminal-ui .signal-row:hover { transform: translateX(2px); }
 }

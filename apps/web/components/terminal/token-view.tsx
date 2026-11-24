@@ -210,7 +210,7 @@ export function TokenView({
             )}
           </section>
         )}
-        <div className="flex min-w-0 flex-col gap-2 lg:min-h-0 lg:overflow-hidden">
+        <div className="rail-in flex min-w-0 flex-col gap-2 lg:min-h-0 lg:overflow-hidden">
           <Header t={t} pools={pools} priceNow={priceNow} serverNow={serverNow} />
           {hydrating && (
             <div role="status" className="flex items-center gap-2 rounded-xl border border-brand/20 bg-brand/[0.06] px-3 py-2 text-xs text-ink/85">

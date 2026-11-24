@@ -11,7 +11,7 @@ import { TagChip, TagList, TAG_META } from './tags';
 const tagKey = (t: Tx) => `${t.trader}:${(t.usd ?? 0) >= 2500 ? 1 : 0}:${t.tags?.join(',') ?? ''}`;
 
 const FILTER_TAGS: MakerTag[] = ['whale', 'dev', 'top10', 'sniper', 'bundler', 'insider', 'fresh'];
-const SHOW = 200;
+const SHOW = 60;
 
 /**
  * GMGN-style trades: rows slide in live, ages tick, makers carry tags. Hovering the table holds the
@@ -42,12 +42,20 @@ export function TradesTable({
   const firstPaint = useRef<Set<string> | null>(null);
   if (trades && !firstPaint.current) firstPaint.current = new Set(trades.map((t) => t.id));
 
+  // Tag arrays are reused across polls when their content is unchanged, so memoized rows that didn't
+  // change skip re-rendering (a fresh array per row re-rendered all of them on every update).
+  const tagCache = useRef(new Map<string, MakerTag[]>());
   const tagged = useMemo(() => {
     const m = new Map<string, MakerTag[]>();
+    const prev = tagCache.current;
     for (const t of trades ?? []) {
       const key = tagKey(t);
-      if (!m.has(key)) m.set(key, makerTags(t.trader, ctx, t.usd, t.tags));
+      if (m.has(key)) continue;
+      const next = makerTags(t.trader, ctx, t.usd, t.tags);
+      const old = prev.get(key);
+      m.set(key, old && old.length === next.length && old.every((v, i) => v === next[i]) ? old : next);
     }
+    tagCache.current = m;
     return m;
   }, [trades, ctx]);
   const tagsOf = useCallback((t: Tx) => tagged.get(tagKey(t)) ?? [], [tagged]);
