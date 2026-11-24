@@ -27,6 +27,7 @@ import {
 } from '@overmind/trade';
 import { API_URL } from '@/lib/api';
 import { auth, useAuth } from '@/lib/auth';
+import { readHint } from '@/lib/session-hint';
 import { publicClient } from '@/lib/balances';
 import { useSettings, type TradeSettings } from '@/lib/settings';
 import { useRiskAck } from './risk-ack';
@@ -263,9 +264,10 @@ export function useQuickTrade(tokenArg: TradeToken) {
   const wallet = (session.user?.wallet ?? undefined) as Address | undefined;
   const trader = wallet ?? GUEST;
 
-  // Load the wallet SDK now (not after the idle delay) and warm nonce/fees for this wallet.
+  // Someone who signed in here before: load the wallet SDK now (not after the idle delay). Visitors load
+  // it when they press the button (auth.login), not just for seeing one.
   useEffect(() => {
-    auth.preload();
+    if (readHint()) auth.preload();
   }, []);
   useEffect(() => {
     if (wallet) void pipelineFor(wallet).warm().catch(() => undefined);

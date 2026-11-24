@@ -9,12 +9,13 @@ import { MemberGate } from './onboarding';
 
 const PrivyHost = dynamic(() => import('./privy-host'), { ssr: false });
 
-/** Wait this long after the page is up before loading Privy, unless someone clicks Sign in first. */
-const LOAD_AFTER_MS = 1_500;
+/** Someone signed in last time: load Privy this long after the page has fully loaded. */
+const MEMBER_DELAY_MS = 2_500;
 
 /**
- * Loads Privy after the terminal is on screen (it's a big SDK), or immediately when someone asks to
- * sign in. Without NEXT_PUBLIC_PRIVY_APP_ID, sign-in stays off and nothing loads.
+ * Loads Privy (a big SDK) only when it's needed: for someone who was signed in here before, a little after
+ * the page is on screen (it restores their session); for visitors, only when they ask to sign in or
+ * trade. Without NEXT_PUBLIC_PRIVY_APP_ID, sign-in stays off and nothing loads.
  */
 export function AuthRoot() {
   const [load, setLoad] = useState(false);
@@ -41,23 +42,24 @@ export function AuthRoot() {
     const idle = (cb: () => void, timeout: number) =>
       typeof window.requestIdleCallback === 'function' ? window.requestIdleCallback(cb, { timeout }) : window.setTimeout(cb, 0);
     if (hint) {
-      // As soon as the page's own scripts are in and the main thread is free (so it doesn't slow the
-      // public parts down), rather than after the usual delay.
+      // A little after the page is fully in and the main thread is free, so the SDK (~700 KB with the
+      // wallet modules) doesn't compete with the page itself. The member is painted from the hint meanwhile.
       let cancelled = false;
-      const go = () => idle(() => !cancelled && setLoad(true), 1_000);
+      let t: number | undefined;
+      const go = () => { t = window.setTimeout(() => idle(() => !cancelled && setLoad(true), 3_000), MEMBER_DELAY_MS); };
       if (document.readyState === 'complete') go();
       else window.addEventListener('load', go, { once: true });
       return () => {
         cancelled = true;
         stop();
+        window.clearTimeout(t);
         window.removeEventListener('load', go);
       };
     }
-    const t = window.setTimeout(() => idle(() => setLoad(true), 4_000), LOAD_AFTER_MS);
-    return () => {
-      stop();
-      window.clearTimeout(t);
-    };
+    // Visitors: nothing loads until they ask to sign in (or press a trade button), via onAuthLoadRequest.
+    // Until then the session is known to be signed out.
+    setAuthState({ ready: true });
+    return stop;
   }, []);
   return (
     <>
