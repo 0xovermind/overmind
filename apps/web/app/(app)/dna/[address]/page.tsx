@@ -17,6 +17,7 @@ export async function generateMetadata({ params }: { params: Promise<{ address: 
   return appShare(`Wallet DNA ${short(w)}`, `/dna/${w}`, 'What kind of trader this wallet is, read from its trades on Robinhood Chain.', {
     openGraph: { images: [{ url: img, width: 1600, height: 900 }] },
     twitter: { card: 'summary_large_image', images: [img] },
+    robots: { index: false, follow: false },
   });
 }
 

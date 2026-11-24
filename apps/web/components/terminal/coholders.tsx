@@ -47,6 +47,8 @@ export function LaunchTools({ token, symbol, wallet }: { token: string; symbol: 
     <section className="rounded-2xl border border-ink/[0.06] bg-surface p-4">
       <Link
         href={`/token/${token}/replay`}
+        rel="nofollow"
+        prefetch={false}
         className="group flex items-center gap-3 rounded-xl bg-gradient-to-r from-[#f06ba8]/[0.12] to-[#78bae6]/[0.1] px-3.5 py-3 transition hover:from-[#f06ba8]/[0.18] active:scale-[0.98]"
       >
         <FilmStrip size={20} className="text-[#f06ba8]" />
@@ -108,7 +110,7 @@ export function LaunchTools({ token, symbol, wallet }: { token: string; symbol: 
             <ul className="mt-1.5 max-h-56 space-y-1 overflow-y-auto pr-1 [scrollbar-width:thin]">
               {d.wallets.map((x) => (
                 <li key={x.wallet} className="flex items-center gap-2 text-xs">
-                  <Link href={`/dna/${x.wallet}`} className="font-mono text-muted hover:text-ink">{short(x.wallet)}</Link>
+                  <Link href={`/dna/${x.wallet}`} rel="nofollow" prefetch={false} className="font-mono text-muted hover:text-ink">{short(x.wallet)}</Link>
                   <span className="font-mono">{x.boughtUsd == null ? '' : usd(x.boughtUsd)}</span>
                   <span className="ml-auto font-mono" style={{ color: STATUS[x.status].color }}>{STATUS[x.status].label}</span>
                 </li>

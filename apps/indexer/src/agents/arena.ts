@@ -283,9 +283,21 @@ async function dnaOf(sql: Sql, wallet: string) {
   };
 }
 
+const dnaCache = new Map<string, { at: number; d: Awaited<ReturnType<typeof dnaOf>> }>();
+const DNA_MS = 10 * 60_000;
+/** DNA reads are heavy (every swap of the wallet): one per wallet per 10 minutes. */
+async function cachedDna(sql: Sql, wallet: string) {
+  const hit = dnaCache.get(wallet);
+  if (hit && Date.now() - hit.at < DNA_MS) return hit.d;
+  const d = await dnaOf(sql, wallet);
+  if (dnaCache.size > 2000) dnaCache.clear();
+  dnaCache.set(wallet, { at: Date.now(), d });
+  return d;
+}
+
 arena.get('/wallets/:address/dna', async (c) => {
   await limit(c, 'read');
-  const d = await dnaOf(c.var.sql, addrParam(c));
+  const d = await cachedDna(c.var.sql, addrParam(c));
   if (!d) throw fail(404, 'no_trades', 'This wallet has no trades Overmind has seen.');
   return c.json(d, 200, publicCache(300));
 });
@@ -304,7 +316,7 @@ arena.get('/wallets/:address/dna/roast', async (c) => {
   if (hit && Date.now() - hit.at < ROAST_MS) return c.json({ text: hit.text }, 200, publicCache(600));
   const key = c.env.DEEPSEEK_API_KEY;
   if (!key) throw fail(503, 'ai_off', 'Overmind AI is not configured.');
-  const d = await dnaOf(c.var.sql, wallet);
+  const d = await cachedDna(c.var.sql, wallet);
   if (!d) throw fail(404, 'no_trades', 'This wallet has no trades Overmind has seen.');
   const text = (await deepseek(key, ROAST, { archetype: d.archetype.name, traits: d.traits, stats: d.stats, best: d.best, worst: d.worst }, { maxTokens: 90, temperature: 0.8 }))
     .trim().replace(/^"|"$/g, '').slice(0, 200);

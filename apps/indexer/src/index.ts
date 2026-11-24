@@ -595,8 +595,9 @@ export default {
         await sql.end({ timeout: 5 });
       }
     }
-    // Every 10 minutes (at :x3): rebuild the stored smart sets every hive reader uses (hive.ts).
-    if (minute % 10 === 3) {
+    // Every 30 minutes (at :03 and :33): rebuild the stored smart sets every hive reader uses (hive.ts). It reads
+    // every position for ~3 minutes on the one-core VPS, and the set barely moves in half an hour.
+    if (minute % 30 === 3) {
       const sql = postgres(dbUrl(env), { max: 1, fetch_types: false, prepare: false });
       try {
         const n = await refreshSmartSets(sql);

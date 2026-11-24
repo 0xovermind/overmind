@@ -200,7 +200,7 @@ export function ReplayPlayer({ r }: { r: Replay }) {
               <li key={`${e.tx}-${e.t}-${e.trader}`} className="row-in flex items-center gap-2 px-4 py-2 text-xs">
                 <span className={`w-8 font-mono font-semibold ${e.side === 'buy' ? 'text-[#3ddc97]' : 'text-[#ff5d6c]'}`}>{e.side}</span>
                 <span className="font-mono tabular-nums">{e.usd == null ? '—' : usd(e.usd)}</span>
-                <Link href={`/dna/${e.trader}`} className="font-mono text-muted hover:text-ink">{short(e.trader)}</Link>
+                <Link href={`/dna/${e.trader}`} rel="nofollow" prefetch={false} className="font-mono text-muted hover:text-ink">{short(e.trader)}</Link>
                 <span className="ml-auto flex gap-1">
                   {e.tags.map((t) => (
                     <span key={t} className="rounded px-1.5 py-0.5 font-mono text-[10px]" style={{ color: TAG[t]?.color, background: `${TAG[t]?.color}1a` }}>

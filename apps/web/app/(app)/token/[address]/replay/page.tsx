@@ -11,7 +11,9 @@ export const dynamic = 'force-dynamic';
 export async function generateMetadata({ params }: { params: Promise<{ address: string }> }): Promise<Metadata> {
   const { address } = await params;
   const a = address.toLowerCase();
-  return appShare('Launch replay', `/token/${a}/replay`, 'Watch this token launch on Robinhood Chain, trade by trade: snipers, smart wallets, the dev.');
+  return appShare('Launch replay', `/token/${a}/replay`, 'Watch this token launch on Robinhood Chain, trade by trade: snipers, smart wallets, the dev.', {
+    robots: { index: false, follow: false },
+  });
 }
 
 export default async function ReplayPage({ params }: { params: Promise<{ address: string }> }) {
