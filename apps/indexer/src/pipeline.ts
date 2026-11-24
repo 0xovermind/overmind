@@ -30,6 +30,9 @@ const ZERO = NATIVE_ETH;
 const QUOTE_SET = new Set<string>([NATIVE_ETH, QUOTES.WETH, QUOTES.USDG, ...Object.values(STOCK_QUOTES)]);
 /** Only start tracking tokens discovered mid-life if they were created within this window. */
 const DISCOVER_MAX_AGE_S = 7 * 24 * 3600;
+/** Holders and 24h volume of a token are recounted at most this often (per isolate). */
+const STATS_EVERY_MS = 60_000;
+const statsAt = new Map<string, number>();
 /** A token whose first transfer is this much older than its first pool predates that pool. */
 const ORIGIN_GAP_S = 10 * 60;
 /** Cap on the Transfer history fetched when a live token is discovered mid-life. */
@@ -966,10 +969,18 @@ export class Pipeline {
                where t.address = ${token}`;
     }
     // PONS curve progress is read from the curves' reserves by the poller every ~15s (curves.ts).
-    await tx`update tokens t set
-        holders = (select count(*) from balances b where b.token = t.address and b.amount > 0),
-        volume_24h_usd = (select coalesce(sum(usd), 0) from swaps s where s.token = t.address and s.time > now() - interval '24 hours')
-      where t.address = any(${touched})`;
+    // Holders and 24h volume are recounted at most once a minute per token: an active token is touched by
+    // nearly every batch, and recounting it each time was most of a batch's database time while catching up.
+    const now = Date.now();
+    const due = touched.filter((t) => now - (statsAt.get(t) ?? 0) >= STATS_EVERY_MS);
+    if (due.length) {
+      await tx`update tokens t set
+          holders = (select count(*) from balances b where b.token = t.address and b.amount > 0),
+          volume_24h_usd = (select coalesce(sum(usd), 0) from swaps s where s.token = t.address and s.time > now() - interval '24 hours')
+        where t.address = any(${due})`;
+      for (const t of due) statsAt.set(t, now);
+      if (statsAt.size > 50_000) statsAt.clear();
+    }
   }
 
   /** Backfill: replay one historical block range (launches, pools, trades, migrations; transfers come separately). */

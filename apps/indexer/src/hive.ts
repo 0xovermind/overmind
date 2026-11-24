@@ -68,10 +68,42 @@ export async function smartWallets(sql: Sql, scope: HiveScope = 'all'): Promise<
   return (await smartSet(sql, scope)).map((r) => r.wallet);
 }
 
-/** The smart set with each wallet's realized profit (bought part only), trade count and token count. */
+/**
+ * The smart set with each wallet's realized profit (bought part only), trade count and token count.
+ * Read from the smart_set table, which the cron rebuilds every few minutes (refreshSmartSets): the
+ * computation reads every position and runs for a minute or more on a busy database, so readers never
+ * run it themselves, except once when the table is still empty.
+ */
 export async function smartSet(sql: Sql, scope: HiveScope = 'all'): Promise<SmartWallet[]> {
   const hit = smartCache.get(scope);
   if (hit && Date.now() - hit.at < SMART_TTL_MS) return hit.rows;
+  const stored = await sql<{ wallet: string; realized: number; trades: number; tokens: number }[]>`
+    select wallet, realized, trades, tokens from smart_set where scope = ${scope} order by realized desc`;
+  const out = stored.length ? stored.map((r) => ({ ...r })) : await storeSmartSet(sql, scope);
+  smartCache.set(scope, { at: Date.now(), rows: out });
+  return out;
+}
+
+/** Recompute both smart sets and store them (cron, every 10 minutes). */
+export async function refreshSmartSets(sql: Sql): Promise<Record<HiveScope, number>> {
+  const all = await storeSmartSet(sql, 'all');
+  const pons = await storeSmartSet(sql, 'pons');
+  smartCache.delete('all');
+  smartCache.delete('pons');
+  return { all: all.length, pons: pons.length };
+}
+
+async function storeSmartSet(sql: Sql, scope: HiveScope): Promise<SmartWallet[]> {
+  const rows = await computeSmartSet(sql, scope);
+  if (!rows.length) return rows;
+  await sql.begin(async (tx) => {
+    await tx`delete from smart_set where scope = ${scope}`;
+    await tx`insert into smart_set ${tx(rows.map((r) => ({ scope, wallet: r.wallet, realized: r.realized, trades: r.trades, tokens: r.tokens })))}`;
+  });
+  return rows;
+}
+
+async function computeSmartSet(sql: Sql, scope: HiveScope): Promise<SmartWallet[]> {
   const rows = await sql<{ wallet: string; realized: string; trades: string; tokens: string }[]>`
     with pos as (
       -- Profit only on what the wallet bought: selling tokens it was sent (a team allocation, an airdrop)
@@ -114,9 +146,7 @@ export async function smartSet(sql: Sql, scope: HiveScope = 'all'): Promise<Smar
     where coalesce(e.early / nullif(e.buys, 0), 0) <= ${MAX_EARLY_SHARE}
     order by c.realized desc
     limit ${SMART_SET}`;
-  const out = rows.map((r) => ({ wallet: r.wallet, realized: Number(r.realized), trades: Number(r.trades), tokens: Number(r.tokens) }));
-  smartCache.set(scope, { at: Date.now(), rows: out });
-  return out;
+  return rows.map((r) => ({ wallet: r.wallet, realized: Number(r.realized), trades: Number(r.trades), tokens: Number(r.tokens) }));
 }
 
 const rowsFor = async (sql: Sql, token: string | null, minVoters: number, limit: number, scope: HiveScope = 'all') => {

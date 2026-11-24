@@ -163,7 +163,7 @@ export function HiveHistory({ token }: { token: string }) {
             </div>
           </div>
         )}
-        {!locked && pts === undefined && <div className="absolute inset-0 grid place-items-center text-xs text-muted">Loading…</div>}
+        {!locked && pts === undefined && <div className="skel absolute inset-2 rounded-lg" />}
         {!locked && (pts === null || (g && g.empty)) && (
           <div className="absolute inset-0 grid place-items-center px-4 text-center text-xs text-muted">No smart-wallet trades in this window yet.</div>
         )}

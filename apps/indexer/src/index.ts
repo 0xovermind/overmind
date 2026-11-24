@@ -28,6 +28,7 @@ import { applyLiftGraduations, liftGraduated, syncLiftProgress } from './liftfun
 import { checkWatched } from './watch';
 import { checkWalletWatch } from './wallet-watch';
 import { agentCall } from './ai-agent';
+import { refreshSmartSets } from './hive';
 import { detectHiveSignals } from './signals-hive';
 
 /** Follow-up delays for launch metadata that wasn't loadable on the first try. */
@@ -368,6 +369,16 @@ app.post('/admin/holders/backfill', async (c) => {
 // Re-read tokens' whole Transfer history from the chain and add what's missing (gaps left while the
 // indexer was down). Idempotent: transfers already stored are skipped, balances move only for new ones.
 // ?tokens=a,b and/or ?top=N (by 24h volume, max 100).
+// Rebuild the stored smart sets now (the cron does it every 10 minutes).
+app.post('/admin/hive/smart-refresh', async (c) => {
+  const sql = postgres(dbUrl(c.env), { max: 1, fetch_types: false, prepare: false });
+  try {
+    return c.json(await refreshSmartSets(sql));
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+});
+
 // Run @overmind_ai's call now (it also runs every 4 hours from the cron).
 app.post('/admin/ai/agent-call', async (c) => {
   const sql = postgres(dbUrl(c.env), { max: 1, fetch_types: false, prepare: false });
@@ -544,6 +555,18 @@ export default {
         if (moved.length) console.log(`supply: ${changes.length} read, ${moved.length} changed (${moved.slice(0, 5).map((x) => x.symbol).join(', ')})`);
       } catch (err) {
         console.error('supply refresh failed', err);
+      } finally {
+        await sql.end({ timeout: 5 });
+      }
+    }
+    // Every 10 minutes (at :x3): rebuild the stored smart sets every hive reader uses (hive.ts).
+    if (minute % 10 === 3) {
+      const sql = postgres(dbUrl(env), { max: 1, fetch_types: false, prepare: false });
+      try {
+        const n = await refreshSmartSets(sql);
+        console.log(`smart sets: ${n.all} all, ${n.pons} pons`);
+      } catch (err) {
+        console.error('smart set refresh failed', err);
       } finally {
         await sql.end({ timeout: 5 });
       }

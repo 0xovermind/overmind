@@ -107,7 +107,7 @@ export function CallCard({
     <li
       ref={ref}
       onClick={onSelect}
-      className={`rounded-xl border p-3 transition ${onSelect ? 'cursor-pointer' : ''} ${active ? 'border-brand/50 bg-brand/[0.05]' : 'border-ink/[0.06] bg-bg/40 hover:border-ink/15'}`}
+      className={`row-in rounded-xl border p-3 transition ${onSelect ? 'cursor-pointer' : ''} ${active ? 'border-brand/50 bg-brand/[0.05]' : 'border-ink/[0.06] bg-bg/40 hover:border-ink/15'}`}
     >
       <div className="flex items-center gap-2">
         <Link href={`/u/${c.author.handle}`} onClick={(e) => e.stopPropagation()} className="flex min-w-0 items-center gap-2 hover:opacity-90">

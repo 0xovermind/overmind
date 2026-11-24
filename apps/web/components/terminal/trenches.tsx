@@ -680,7 +680,7 @@ const Row = memo(function Row({
     !!t.airdropped && t.airdropped > 10 && `${t.airdropped} fake holders`,
   ].filter(Boolean) as string[];
   return (
-    <li ref={ref} className="trench-row relative overflow-hidden border-b border-ink/[0.05] transition-colors hover:border-ink/[0.1]">
+    <li ref={ref} className="trench-row row-in relative overflow-hidden border-b border-ink/[0.05] transition-colors hover:border-ink/[0.1]">
       {/* Keyed by the update time, so the flash replays on each change and fades out on its own. */}
       {flashAt > 0 && <span key={flashAt} className="trench-flash pointer-events-none absolute inset-0" />}
       <div className="group relative px-3 pb-2.5 pt-3 transition-colors hover:bg-ink/[0.03] sm:px-4 md:px-5">

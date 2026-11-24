@@ -325,7 +325,7 @@ export function WatchlistView() {
           <section className="rounded-2xl border border-ink/[0.06] bg-surface">
             <div className="border-b border-ink/[0.06] px-4 py-3 text-sm font-semibold">Starred tokens {items ? <span className="text-muted">{items.length}</span> : null}</div>
             {items === null ? (
-              <p className="px-4 py-8 text-center text-sm text-muted">Loading…</p>
+              <div className="space-y-3 p-4">{[0, 1, 2].map((i) => <div key={i} className="skel h-10 w-full rounded-lg" />)}</div>
             ) : items.length === 0 ? (
               <p className="px-4 py-8 text-center text-sm text-muted">Nothing starred yet. Open any token and hit Watch.</p>
             ) : (

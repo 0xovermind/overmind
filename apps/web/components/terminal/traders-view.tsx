@@ -108,7 +108,7 @@ export function TradersView() {
           </thead>
           <tbody>
             {rows === null ? (
-              <tr><td colSpan={7} className="px-4 py-10 text-center text-muted">{err ? 'Could not load the traders. Retrying…' : 'Loading…'}</td></tr>
+              err ? <tr><td colSpan={7} className="px-4 py-10 text-center text-muted">Could not load the traders. Retrying…</td></tr> : [0, 1, 2, 3, 4, 5].map((i) => <tr key={i}><td colSpan={7} className="px-4 py-3"><div className="skel h-6 w-full rounded-lg" /></td></tr>)
             ) : (
               rows.map((t) => (
                 <tr key={t.wallet} className="border-b border-ink/[0.04] last:border-0">

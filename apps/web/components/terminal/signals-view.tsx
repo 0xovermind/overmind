@@ -36,7 +36,7 @@ function Row({ s }: { s: Signal }) {
   // A buying signal "worked" if the token went up after it; a selling one if it went down.
   const right = ch == null || Math.abs(ch) < 0.5 ? null : up ? ch > 0 : ch < 0;
   return (
-    <li>
+    <li className="row-in">
       <Link href={`/token/${s.token}`} className="signal-row group grid grid-cols-[44px_1fr_auto] items-center gap-3 rounded-xl px-3 py-3 sm:grid-cols-[44px_1fr_150px_120px]">
         <TokenAvatar t={{ address: s.token, symbol: s.symbol, launchpad: null, image_url: s.image_url }} size={40} />
         <div className="min-w-0">
