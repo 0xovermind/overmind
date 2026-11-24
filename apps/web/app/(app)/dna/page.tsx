@@ -23,7 +23,8 @@ const KINDS = [
 
 export default function DnaIndex() {
   return (
-    <main className="relative mx-auto w-full max-w-3xl px-4 pb-16 pt-10">
+    <div className="h-full overflow-y-auto">
+      <main className="relative mx-auto w-full max-w-3xl px-4 pb-16 pt-10">
       <div className="dna-orb pointer-events-none absolute left-1/2 top-0 -z-10 size-[420px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(240,107,168,0.22),transparent_65%)] blur-2xl" />
       <div className="text-center">
         <div className="font-mono text-xs uppercase tracking-[0.14em] text-muted">Wallet DNA</div>
@@ -45,5 +46,6 @@ export default function DnaIndex() {
         ))}
       </ul>
     </main>
+    </div>
   );
 }

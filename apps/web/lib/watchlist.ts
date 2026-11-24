@@ -30,7 +30,7 @@ export interface WalletAlert {
   kind: 'wallet';
   token: { address: string; symbol: string | null; imageUrl: string | null };
   wallet: { address: string; label: string | null };
-  action: 'buy' | 'sell' | 'in' | 'out' | 'coexit';
+  action: 'buy' | 'sell' | 'in' | 'out' | 'coexit' | 'exit';
   amount: number;
   usd: number | null;
   counterparty: string | null;

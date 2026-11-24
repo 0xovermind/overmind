@@ -101,7 +101,8 @@ export default async function DnaPage({ params }: { params: Promise<{ address: s
   const w = address.toLowerCase();
   const d = isWallet(w) ? await getDna(w) : null;
   return (
-    <main className="mx-auto w-full max-w-3xl px-4 pb-16 pt-6">
+    <div className="h-full overflow-y-auto">
+      <main className="mx-auto w-full max-w-3xl px-4 pb-16 pt-6">
       {d ? (
         <Card d={d} />
       ) : (
@@ -120,5 +121,6 @@ export default async function DnaPage({ params }: { params: Promise<{ address: s
         Read from this wallet&apos;s swaps that Overmind indexed (its latest 20,000). Realized profit counts the cost of the share it sold. Not financial advice.
       </p>
     </main>
+    </div>
   );
 }

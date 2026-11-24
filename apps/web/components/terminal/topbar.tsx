@@ -17,6 +17,7 @@ import { AlertsBell } from './watch';
 const NAV: { href: string; label: string; wide?: boolean }[] = [
   { href: '/trenches', label: 'Markets' },
   { href: '/signals', label: 'Signals' },
+  { href: '/radar', label: 'Radar' },
   { href: '/arena', label: 'Arena' },
   { href: '/daily', label: 'Daily' },
   { href: '/feed', label: 'Calls' },

@@ -29,6 +29,7 @@ import { checkWatched } from './watch';
 import { checkWalletWatch } from './wallet-watch';
 import { agentCall } from './ai-agent';
 import { arenaSync, coexitAlerts } from './agents/arena';
+import { exitAlarm, launchReports } from './agents/radar';
 import { refreshSmartSets } from './hive';
 import { detectHiveSignals } from './signals-hive';
 
@@ -627,6 +628,20 @@ export default {
         if (posted) console.log(`overmind_ai call: ${posted}`);
       } catch (err) {
         console.error('overmind_ai call failed', err);
+      } finally {
+        await sql.end({ timeout: 5 });
+      }
+    }
+    // Every minute: Exit Alarm (members' tokens being sold by their dev or top holders) and the launch radar's
+    // first-minute reports (agents/radar.ts).
+    {
+      const sql = postgres(dbUrl(env), { max: 1, fetch_types: false, prepare: false });
+      try {
+        const x = await exitAlarm(sql);
+        const r = await launchReports(sql);
+        if (x || r) console.log(`exit alarm: ${x} alerts; radar: ${r} reports`);
+      } catch (err) {
+        console.error('exit alarm / radar failed', err);
       } finally {
         await sql.end({ timeout: 5 });
       }

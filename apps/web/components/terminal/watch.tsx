@@ -48,7 +48,7 @@ export function PushToggle({ compact = false }: { compact?: boolean }) {
       }`}
     >
       <BellRinging size={14} weight={on ? 'fill' : 'regular'} />
-      {state === 'busy' ? 'One moment…' : on ? 'Browser alerts on' : 'Get alerts in this browser'}
+      {state === 'busy' ? 'One moment…' : on ? 'Push alerts on' : 'Get push alerts on this device'}
     </button>
   );
 }
@@ -84,10 +84,32 @@ const ACTION: Record<WalletAlert['action'], { verb: string; color: string }> = {
   in: { verb: 'received', color: 'text-ink' },
   out: { verb: 'sent', color: 'text-muted' },
   coexit: { verb: 'leaving', color: 'text-[#ff5d6c]' },
+  exit: { verb: 'is selling', color: 'text-[#ff5d6c]' },
 };
 
 /** One alert row (hive flip or followed-wallet move), for the bell and the watchlist page. */
 function AlertItem({ a, onNavigate }: { a: AnyAlert; onNavigate?: () => void }) {
+  if (a.kind === 'wallet' && a.action === 'exit') {
+    const [role, share] = (a.counterparty ?? '').split('|');
+    const who = role === 'dev' ? 'The dev' : role === 'dev-funded wallet' ? 'A dev-funded wallet' : 'A top holder';
+    return (
+      <Link
+        href={`/token/${a.token.address}`}
+        onClick={onNavigate}
+        className={`flex items-center gap-3 px-4 py-3 transition hover:bg-ink/[0.04] ${a.read ? '' : 'bg-[#ff5d6c]/[0.06]'}`}
+      >
+        <Icon url={a.token.imageUrl} symbol={a.token.symbol} />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm">
+            <span className="font-semibold text-[#ff5d6c]">Exit alarm:</span> {who} is selling ${a.token.symbol ?? '?'}
+          </div>
+          <div className="mt-0.5 font-mono text-xs text-muted">
+            {shortAddr(a.wallet.address)}{share ? ` · ${share}% of supply` : ''}{a.usd != null ? ` · ${usd(a.usd)}` : ''} · {ago(a.at)}
+          </div>
+        </div>
+      </Link>
+    );
+  }
   if (a.kind === 'wallet' && a.action === 'coexit') {
     return (
       <Link

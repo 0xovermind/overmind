@@ -18,7 +18,8 @@ export default async function ReplayPage({ params }: { params: Promise<{ address
   const { address } = await params;
   const r = await getReplay(address);
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 pb-16 pt-5">
+    <div className="h-full overflow-y-auto">
+      <main className="mx-auto w-full max-w-7xl px-4 pb-16 pt-5">
       {r ? (
         <>
           <header className="mb-4 flex flex-wrap items-center gap-3">
@@ -43,5 +44,6 @@ export default async function ReplayPage({ params }: { params: Promise<{ address
         <p className="rounded-2xl border border-ink/[0.07] bg-surface p-8 text-center text-sm text-muted">Overmind does not index this token.</p>
       )}
     </main>
+    </div>
   );
 }

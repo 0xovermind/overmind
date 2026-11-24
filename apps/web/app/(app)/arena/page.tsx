@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { appShare } from '@/lib/share';
 import { asHorizon, getArena, HORIZON_LABEL, SOURCE, type ArenaCall, type ArenaSource, type ArenaSourceStats, type Outcome } from '@/lib/arena';
 import { TokenAvatar } from '@/components/terminal/bits';
+import { ArenaTabs } from '@/components/terminal/arena-tabs';
 
 export const metadata: Metadata = appShare(
   'Arena: Hive vs Crowd vs AI',
@@ -143,8 +144,10 @@ export default async function ArenaPage({ searchParams }: { searchParams: Promis
   const a = await getArena(h);
   const sources = a?.sources ?? [];
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
+    <div className="h-full overflow-y-auto">
+      <main className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6">
+      <ArenaTabs active="/arena" />
+      <header className="mt-4 flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="font-mono text-xs uppercase tracking-[0.14em] text-muted">Arena</div>
           <h1 className="mt-1 text-3xl font-extrabold tracking-tight sm:text-4xl">
@@ -243,5 +246,6 @@ export default async function ArenaPage({ searchParams }: { searchParams: Promis
         </>
       )}
     </main>
+    </div>
   );
 }

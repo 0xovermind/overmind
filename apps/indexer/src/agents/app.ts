@@ -14,6 +14,7 @@ import { wallets } from './wallets';
 import { explain } from './explain';
 import { votes } from './votes';
 import { arena } from './arena';
+import { radar } from './radar';
 import { LLMS_TXT } from '@overmind/agents/llms-txt';
 export { adminV1 } from './admin';
 
@@ -41,6 +42,7 @@ v1.route('/', wallets);
 v1.route('/', explain);
 v1.route('/', votes);
 v1.route('/', arena);
+v1.route('/', radar);
 
 /** The agent instructions, also at /llms.txt on the API and the website. */
 v1.get('/llms.txt', (c) => c.body(LLMS_TXT, 200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'public, max-age=300, s-maxage=300' }));
