@@ -4,6 +4,7 @@ import { appShare } from '@/lib/share';
 import { OVHIVE_BUY_URL } from '@/lib/pro';
 import { OVHIVE_CA, OVHIVE_TRADE_URL } from '@/lib/ovhive';
 import { usd } from '@/lib/format';
+import { DevWallet, getDev } from '@/components/terminal/dev-wallet';
 
 export const metadata: Metadata = appShare('$OVHIVE burns', '/burns', 'Every $OVHIVE burn, read from Robinhood Chain: how much has been sent to the dead address so far.');
 // Per request so the CSP nonce (middleware.ts) reaches Next's inline scripts.
@@ -138,7 +139,7 @@ async function getBurns(): Promise<Burns | null> {
 }
 
 export default async function BurnsPage() {
-  const [d, card, holders] = await Promise.all([getBurns(), getCard(), getHolders()]);
+  const [d, card, holders, dev] = await Promise.all([getBurns(), getCard(), getHolders(), getDev()]);
   const pct = d ? d.share * 100 : 0;
   return (
     <div className="h-full overflow-y-auto">
@@ -166,6 +167,7 @@ export default async function BurnsPage() {
 
         <RoadToUniswap c={card} />
         <HolderGrowth h={holders} />
+        <DevWallet d={dev} />
 
         <section className="mt-4 rounded-2xl border border-ink/[0.07] bg-surface p-2">
           {!d ? (

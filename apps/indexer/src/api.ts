@@ -18,6 +18,7 @@ import { TRANSPARENCY_CACHE_S, transparency } from './transparency';
 import { asScope, hiveBoard, hiveDaily, hiveHistory, hiveToken, smartTraders } from './hive';
 import { hiveSignals, pendingSignals, PUBLIC_DELAY } from './signals-hive';
 import { BurnsNotReady, ovhiveBurns } from './burns';
+import { devWallet } from './dev-wallet';
 
 type Ctx = { Bindings: Env; Variables: { sql: Sql } };
 
@@ -345,6 +346,8 @@ api.get('/ovhive/burns', async (c) => {
     throw err;
   }
 });
+/** $OVHIVE dev transparency: the dev wallet's buys, sales, burns and transfers, and the team wallets it funded (dev-wallet.ts). */
+api.get('/ovhive/dev', async (c) => c.json(await devWallet(c.var.sql), 200, cache(120)));
 /** Hive Daily: the smart set's biggest net buys and sells over the last 24h (board-clean tokens only). */
 api.get('/hive/daily', async (c) => c.json(await hiveDaily(c.var.sql, Number(c.req.query('limit') ?? 5), asScope(c.req.query('scope'))), 200, cache(300)));
 /** Hive signals (flips of the smart crowd's side), delayed for the public; real time is /v1/hive/signals (Hive Pro). */
