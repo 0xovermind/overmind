@@ -4,13 +4,19 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowSquareOut, Check, Copy, GearSix, SignOut, User, Wallet } from '@phosphor-icons/react';
 import { auth, displayName, useAuth } from '@/lib/auth';
-import { fmtUnits, useBalances } from '@/lib/balances';
-import { useWalletHoldings } from '@/lib/holdings';
 import { useMe } from '@/lib/members';
 import { EXPLORER, short } from '@/lib/format';
 import { MemberAvatar } from '../member-avatar';
 import { useHint } from '@/lib/session-hint';
-import { WalletPanel } from './wallet-panel';
+import dynamic from 'next/dynamic';
+
+// Wallet pieces load lazily (they bring viem): see account-wallet.tsx.
+const BalanceButton = dynamic(() => import('./account-wallet').then((m) => m.BalanceButton), {
+  ssr: false,
+  loading: () => <span className="block h-9 w-20 animate-pulse rounded-xl bg-ink/[0.05]" />,
+});
+const MenuBalance = dynamic(() => import('./account-wallet').then((m) => m.MenuBalance), { ssr: false, loading: () => <span className="font-mono">…</span> });
+const WalletPanel = dynamic(() => import('./wallet-panel').then((m) => m.WalletPanel), { ssr: false });
 
 /** Top-bar sign-in button, and the account menu once signed in. */
 export function AccountMenu() {
@@ -21,8 +27,6 @@ export function AccountMenu() {
   const [open, setOpen] = useState(false);
   const [walletOpen, setWalletOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
-  // Balance only while the menu is open (the wallet drawer reads its own).
-  const { balances } = useBalances(open ? (user?.wallet ?? null) : null);
 
   useEffect(() => {
     if (!open) return;
@@ -101,7 +105,7 @@ export function AccountMenu() {
           <WalletRow label="Overmind wallet" address={user.wallet} pending={!user.wallet} />
           <div className="flex items-center justify-between border-b border-ink/[0.06] px-4 py-2.5 text-sm">
             <span className="text-muted">Balance</span>
-            <span className="font-mono">{balances ? `${fmtUnits(balances.eth, 18, 4)} ETH` : '…'}</span>
+            <MenuBalance wallet={user.wallet ?? null} />
           </div>
           {user.externalWallet && <WalletRow label="Signed in with" address={user.externalWallet} />}
           <div className="p-1.5">
@@ -200,36 +204,6 @@ export function UserAvatar({ user, size }: { user: NonNullable<ReturnType<typeof
   const me = useMe();
   const member = me?.status === 'registered' ? me.member : null;
   return <MemberAvatar member={member} wallet={user.wallet ?? user.externalWallet} label={displayName(user).replace(/^@/, '')} size={size} />;
-}
-
-const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const moneyWhole = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
-
-/**
- * Total wallet value in dollars next to the account chip (the same total as the wallet view): ETH at
- * the live price plus every token held. Opens the wallet panel. Phones drop the cents above $1,000.
- */
-function BalanceButton({ wallet, onOpen }: { wallet: `0x${string}`; onOpen: () => void }) {
-  const h = useWalletHoldings(wallet);
-  const v = h.totalUsd;
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      title="Wallet balance: ETH, USDG and every token you hold"
-      aria-label={v == null ? 'Wallet balance' : `Wallet balance ${money.format(v)}`}
-      className="rounded-xl border border-ink/[0.08] bg-surface px-3 py-2 font-mono text-sm font-semibold tabular-nums transition hover:border-ink/20"
-    >
-      {v == null ? (
-        <span className="inline-block h-4 w-14 animate-pulse rounded bg-ink/[0.08] align-middle" />
-      ) : (
-        <>
-          <span className="sm:hidden">{v >= 1000 ? moneyWhole.format(v) : money.format(v)}</span>
-          <span className="hidden sm:inline">{money.format(v)}</span>
-        </>
-      )}
-    </button>
-  );
 }
 
 function NameSkeleton() {

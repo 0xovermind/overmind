@@ -8,7 +8,7 @@ import { feed } from '@/lib/feed/client';
 import { useFeedStatus } from '@/lib/feed/react';
 import { EXPLORER, short } from '@/lib/format';
 import { TokenAvatar } from './bits';
-import { HydratingPill, isHydrating } from './chart';
+import { HydratingPill, isHydrating } from './chart-status';
 import { TokenView } from './token-view';
 import type { Hydration } from '@/lib/feed/protocol';
 

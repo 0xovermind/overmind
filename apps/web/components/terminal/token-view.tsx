@@ -13,8 +13,14 @@ import { mergePools, useApiPools } from '@/lib/pools';
 
 import { holderContext, toWhole, TRADE_LIMIT, windowStats, WINDOWS, type HolderInfo, type Tx, type WindowId, type WindowStats as WindowStatsT } from '@/lib/trades';
 import { RingedAvatar, RiskTag, ringOf, SocialLinks, riskText } from './bits';
-import { hydrationLabel, isHydrating, PriceChart } from './chart';
+import { hydrationLabel, isHydrating } from './chart-status';
 import dynamic from 'next/dynamic';
+
+// The chart library is ~50 KB: it loads right after the page instead of holding up the first paint.
+const PriceChart = dynamic(() => import('./chart').then((m) => m.PriceChart), {
+  ssr: false,
+  loading: () => <div className="skel m-3 h-[calc(100%-1.5rem)] min-h-[240px] rounded-xl" />,
+});
 import { tradingAvailable } from '@/components/trade/flag';
 import { useAuth } from '@/lib/auth';
 import { usePosition } from '@/lib/position';
