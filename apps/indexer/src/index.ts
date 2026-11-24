@@ -835,9 +835,9 @@ export default {
                 select g.token from signals g join tokens t on t.address = g.token
                 where g.token = any(${wanted})
                   and g.updated_at > now() - case
-                    when t.created_at > now() - interval '1 hour' then interval '15 seconds'
-                    when t.created_at > now() - interval '24 hours' then interval '2 minutes'
-                    else interval '10 minutes' end`
+                    when t.created_at > now() - interval '1 hour' then interval '60 seconds'
+                    when t.created_at > now() - interval '24 hours' then interval '10 minutes'
+                    else interval '30 minutes' end`
             ).map((r) => r.token)
           : [],
       );

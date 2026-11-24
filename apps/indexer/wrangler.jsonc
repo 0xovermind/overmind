@@ -36,8 +36,8 @@
       { "binding": "METADATA_QUEUE", "queue": "overmind-metadata" }
     ],
     "consumers": [
-      { "queue": "overmind-enrich", "max_batch_size": 50, "max_batch_timeout": 2, "max_concurrency": 8 },
-      { "queue": "overmind-metadata", "max_batch_size": 10, "max_batch_timeout": 1, "max_concurrency": 4, "max_retries": 10 }
+      { "queue": "overmind-enrich", "max_batch_size": 50, "max_batch_timeout": 2, "max_concurrency": 2 },
+      { "queue": "overmind-metadata", "max_batch_size": 10, "max_batch_timeout": 1, "max_concurrency": 2, "max_retries": 10 }
     ]
   },
   // Database: Neon's pooled endpoint (aws-ap-southeast-1) in the DATABASE_URL secret, *without*

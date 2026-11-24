@@ -31,7 +31,7 @@ const QUOTE_SET = new Set<string>([NATIVE_ETH, QUOTES.WETH, QUOTES.USDG, ...Obje
 /** Only start tracking tokens discovered mid-life if they were created within this window. */
 const DISCOVER_MAX_AGE_S = 7 * 24 * 3600;
 /** Holders and 24h volume of a token are recounted at most this often (per isolate). */
-const STATS_EVERY_MS = 60_000;
+const STATS_EVERY_MS = 4 * 60_000;
 const statsAt = new Map<string, number>();
 /** A token whose first transfer is this much older than its first pool predates that pool. */
 const ORIGIN_GAP_S = 10 * 60;
