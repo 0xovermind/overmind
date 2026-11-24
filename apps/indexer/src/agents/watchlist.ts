@@ -114,7 +114,7 @@ watchlist.get('/me/alerts', async (c) => {
     token: { address: r.token, symbol: r.symbol, imageUrl: r.image_url },
     wallet: { address: r.wallet, label: r.label },
     action: r.kind,
-    amount: Number(BigInt(r.amount) / 10n ** BigInt(Math.max((r.decimals ?? 18) - 6, 0))) / 1e6,
+    amount: r.kind === 'coexit' ? Number(r.amount) : Number(BigInt(r.amount) / 10n ** BigInt(Math.max((r.decimals ?? 18) - 6, 0))) / 1e6,
     usd: r.usd,
     counterparty: r.counterparty,
     tx: r.tx,

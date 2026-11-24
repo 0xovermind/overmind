@@ -28,6 +28,7 @@ import { applyLiftGraduations, liftGraduated, syncLiftProgress } from './liftfun
 import { checkWatched } from './watch';
 import { checkWalletWatch } from './wallet-watch';
 import { agentCall } from './ai-agent';
+import { arenaSync, coexitAlerts } from './agents/arena';
 import { refreshSmartSets } from './hive';
 import { detectHiveSignals } from './signals-hive';
 
@@ -380,6 +381,15 @@ app.post('/admin/hive/smart-refresh', async (c) => {
 });
 
 // Run @overmind_ai's call now (it also runs every 4 hours from the cron).
+app.post('/admin/arena/sync', async (c) => {
+  const sql = postgres(dbUrl(c.env), { max: 1, fetch_types: false, prepare: false });
+  try {
+    return c.json({ ...(await arenaSync(sql)), coexit: await coexitAlerts(sql) });
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+});
+
 app.post('/admin/ai/agent-call', async (c) => {
   const sql = postgres(dbUrl(c.env), { max: 1, fetch_types: false, prepare: false });
   try {
@@ -592,6 +602,19 @@ export default {
         console.log(`smart sets: ${n.all} all, ${n.pons} pons`);
       } catch (err) {
         console.error('smart set refresh failed', err);
+      } finally {
+        await sql.end({ timeout: 5 });
+      }
+    }
+    // Every 10 minutes (at :x6): Arena calls collected and scored; members' co-buyer exit alerts (agents/arena.ts).
+    if (minute % 10 === 6) {
+      const sql = postgres(dbUrl(env), { max: 1, fetch_types: false, prepare: false });
+      try {
+        const a = await arenaSync(sql);
+        const x = await coexitAlerts(sql);
+        console.log(`arena: ${a.added} new calls, ${a.scored} scored; ${x} co-exit alerts`);
+      } catch (err) {
+        console.error('arena sync failed', err);
       } finally {
         await sql.end({ timeout: 5 });
       }

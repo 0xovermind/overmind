@@ -335,3 +335,16 @@
 
 /* $OVHIVE chip in the terminal header. */
 .ovhive-grad { background: linear-gradient(100deg, rgb(250,203,14), rgb(240,107,168) 45%, rgb(120,186,230)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+/* Arena, Wallet DNA, launch replay */
+@keyframes arena-up { from { opacity: 0; transform: translateY(14px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes col-grow { from { transform: scaleY(0); } to { transform: none; } }
+@keyframes dna-glow { 0%, 100% { opacity: 0.55; transform: scale(1); } 50% { opacity: 0.85; transform: scale(1.06); } }
+@keyframes bubble-in { from { opacity: 0; transform: scale(0.2); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: no-preference) {
+  .arena-card { animation: arena-up 0.55s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .arena-bar { transform-origin: left; animation: grow-x 0.9s cubic-bezier(0.16, 1, 0.3, 1) both 0.15s; }
+  .arena-col { transform-box: fill-box; transform-origin: bottom; animation: col-grow 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .dna-orb { animation: dna-glow 5s ease-in-out infinite; }
+  .bubble-in { animation: bubble-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+}

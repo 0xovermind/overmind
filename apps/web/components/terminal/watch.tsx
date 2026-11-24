@@ -83,10 +83,30 @@ const ACTION: Record<WalletAlert['action'], { verb: string; color: string }> = {
   sell: { verb: 'sold', color: 'text-[#ff5d6c]' },
   in: { verb: 'received', color: 'text-ink' },
   out: { verb: 'sent', color: 'text-muted' },
+  coexit: { verb: 'leaving', color: 'text-[#ff5d6c]' },
 };
 
 /** One alert row (hive flip or followed-wallet move), for the bell and the watchlist page. */
 function AlertItem({ a, onNavigate }: { a: AnyAlert; onNavigate?: () => void }) {
+  if (a.kind === 'wallet' && a.action === 'coexit') {
+    return (
+      <Link
+        href={`/token/${a.token.address}`}
+        onClick={onNavigate}
+        className={`flex items-center gap-3 px-4 py-3 transition hover:bg-ink/[0.04] ${a.read ? '' : 'bg-ink/[0.03]'}`}
+      >
+        <Icon url={a.token.imageUrl} symbol={a.token.symbol} />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm">
+            <span className="text-[#ff5d6c]">{a.amount} wallets</span> that bought ${a.token.symbol ?? '?'} with you are leaving
+          </div>
+          <div className="mt-0.5 font-mono text-xs text-muted">
+            sold or trimmed in the last hour{a.counterparty ? ` · of ${a.counterparty}` : ''}{a.usd != null ? ` · ${usd(a.usd)}` : ''} · {ago(a.at)}
+          </div>
+        </div>
+      </Link>
+    );
+  }
   if (a.kind === 'wallet') {
     const act = ACTION[a.action];
     const who = a.wallet.label ?? shortAddr(a.wallet.address);

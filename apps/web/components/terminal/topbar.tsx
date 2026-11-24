@@ -14,14 +14,16 @@ import { FeedbackButton } from './feedback';
 import { OVHIVE_CA, OVHIVE_TRADE_URL } from '@/lib/ovhive';
 import { AlertsBell } from './watch';
 
-const NAV = [
+const NAV: { href: string; label: string; wide?: boolean }[] = [
   { href: '/trenches', label: 'Markets' },
   { href: '/signals', label: 'Signals' },
+  { href: '/arena', label: 'Arena' },
   { href: '/daily', label: 'Daily' },
   { href: '/feed', label: 'Calls' },
-  { href: '/agents', label: 'Agents' },
+  { href: '/agents', label: 'Agents', wide: true },
   { href: '/traders', label: 'Traders' },
-  { href: '/leaderboard', label: 'Ranks' },
+  { href: '/dna', label: 'DNA' },
+  { href: '/leaderboard', label: 'Ranks', wide: true },
   { href: '/watchlist', label: 'Watchlist' },
 ];
 
@@ -35,12 +37,12 @@ export function TopBar({ theme = 'dark' }: { theme?: 'dark' | 'light' }) {
         {/* Same dashed chip as the landing's, in the dark theme. */}
         <span className="rounded-full border border-dashed border-ink/20 px-1.5 py-px font-mono text-[9px] uppercase tracking-wider text-muted">Beta</span>
       </Link>
-      <nav className="hidden items-center gap-1 text-sm md:flex">
+      <nav className="hidden items-center gap-0.5 text-sm md:flex">
         {NAV.map((n) => (
           <Link
             key={n.label}
             href={n.href}
-            className={`nav-pill relative rounded-lg px-3 py-1.5 transition ${path.startsWith(n.href) ? 'is-active bg-ink/[0.07] text-ink' : 'text-muted hover:text-ink'}`}
+            className={`nav-pill relative rounded-lg px-2.5 py-1.5 transition ${n.wide ? 'hidden xl:block ' : ''}${path.startsWith(n.href) ? 'is-active bg-ink/[0.07] text-ink' : 'text-muted hover:text-ink'}`}
           >
             {n.label}
           </Link>

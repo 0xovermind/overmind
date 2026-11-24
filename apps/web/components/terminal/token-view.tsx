@@ -27,6 +27,7 @@ import { usePosition } from '@/lib/position';
 import { useHint } from '@/lib/session-hint';
 import { updateSettings, useSettings } from '@/lib/settings';
 import { AboutCard, PositionCard, ThesisBox } from './simple-rail';
+import { LaunchTools } from './coholders';
 import { SafetyGrid } from './safety-grid';
 import { HiveCard } from './hive-card';
 import { TokenMapTab, warmTokenMap } from './token-map';
@@ -258,6 +259,7 @@ export function TokenView({
               <div className="hidden lg:block">{stats}</div>
               {trading ? <TradePanel priceUsd={priceNow} position={position} token={tradeToken} /> : <TradeSoon symbol={t.symbol} />}
               <HiveCard token={t.address} />
+              <LaunchTools token={t.address} symbol={t.symbol} wallet={myWallet} />
               <PoolPanel t={t} pools={pools} supply={supply} serverNow={serverNow} />
               <Safety t={t} />
               <DevRecord t={t} />
@@ -267,6 +269,7 @@ export function TokenView({
               {/* On phones the trade card opens from the sticky Buy/Sell bar instead. */}
               {trading ? desktop && <SimpleTrade token={tradeToken} priceUsd={priceNow} position={position} /> : <TradeSoon symbol={t.symbol} />}
               <HiveCard token={t.address} />
+              <LaunchTools token={t.address} symbol={t.symbol} wallet={myWallet} />
               <PositionCard t={t} position={position} supply={supply} />
               <ThesisBox t={t} position={position} />
               <About
