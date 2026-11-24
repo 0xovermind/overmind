@@ -1,12 +1,10 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, Geist_Mono, Hanken_Grotesk } from 'next/font/google';
+import { Inter, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { StaleDeployGuard } from '@/components/stale-deploy-guard';
 
 const sans = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
 const mono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono', display: 'swap' });
-/** The terminal's one typeface (terminal.css): a soft geometric grotesk. */
-const hanken = Hanken_Grotesk({ subsets: ['latin'], variable: '--font-hanken', display: 'swap' });
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://overmind.ink'),
@@ -29,7 +27,7 @@ export const viewport: Viewport = { themeColor: '#121212' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable} ${hanken.variable}`}>
+    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
       <body className="font-sans">
         <StaleDeployGuard />
         {children}

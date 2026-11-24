@@ -439,27 +439,12 @@ function Header({ t, pools, priceNow, serverNow }: { t: TokenDetail; pools: Pool
         </div>
       </div>
       <div className="flex flex-wrap gap-x-6 gap-y-2">
-        <BigMoney k="Market cap" n={mcap} />
+        <Stat k="Market cap" v={usd(mcap)} big />
         <Stat k="Price" v={price(priceNow)} />
         <Stat k="Liquidity" v={liquidity == null ? '—' : usd(liquidity)} title={pools.rows.length ? `Across ${pools.rows.length} pools` : 'Not reported for this token yet'} />
         <Stat k="Holders" v={nf.format(t.holders)} />
         <Stat k="ATH mcap" v={usd(t.ath_market_cap_usd)} />
         {t.status !== 'migrated' && t.bonding_progress != null && <Stat k="Bonding" v={pct(t.bonding_progress * 100, 0)} />}
-      </div>
-    </div>
-  );
-}
-
-/** The headline number: whole dollars bright, cents dimmed, tight tracking. */
-function BigMoney({ k, n }: { k: string; n: number | null | undefined }) {
-  if (n == null || !Number.isFinite(n)) return <Stat k={k} v="—" big />;
-  const [whole, cents] = n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split('.');
-  return (
-    <div>
-      <div className="text-[11px] text-muted">{k}</div>
-      <div className="big-money text-[30px] font-bold leading-none">
-        ${whole}
-        <span className="text-ink/35">.{cents}</span>
       </div>
     </div>
   );

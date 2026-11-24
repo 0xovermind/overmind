@@ -1,7 +1,6 @@
 import { AuthRoot } from '@/components/terminal/auth/auth-root';
 import { TopBar } from '@/components/terminal/topbar';
 import { Spotlight } from '@/components/terminal/spotlight';
-import { Dock } from '@/components/terminal/dock';
 import { SyncBanner } from '@/components/terminal/sync-banner';
 import { NavProgress } from '@/components/terminal/nav-progress';
 import { Suspense } from 'react';
@@ -24,7 +23,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <div className="page-in relative min-h-0 flex-1">{children}</div>
       <AuthRoot />
       <Spotlight />
-      <Dock />
     </div>
   );
 }
