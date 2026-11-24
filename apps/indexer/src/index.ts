@@ -423,6 +423,31 @@ app.post('/admin/transfers/resync', async (c) => {
   }
 });
 
+// Gap fill: after the poller's cursor was moved forward (to go live at once), replay the skipped block range
+// [from, to] here, ≤ 2,000 blocks per call. Historical mode never touches the live cursor; swaps and
+// transfers are deduped by (tx, log index), so a retried call doesn't count twice. Driven by a shell loop.
+app.post('/admin/gap/fill', async (c) => {
+  const from = BigInt(c.req.query('from') ?? '0');
+  const end = BigInt(c.req.query('to') ?? '0');
+  if (from <= 0n || end < from) return c.json({ error: 'from and to required' }, 400);
+  const to = end - from >= 2_000n ? from + 1_999n : end;
+  const sql = postgres(dbUrl(c.env), { max: 2, fetch_types: false, prepare: false });
+  try {
+    const pipeline = new Pipeline(sql, new Rpc(c.env.RPC_URL, 'bulk'), { historical: true });
+    let logs = 0;
+    let swaps = 0;
+    for (let a = from; a <= to; a += 500n) {
+      const b = a + 499n > to ? to : a + 499n;
+      const s = await pipeline.run(a, b);
+      logs += s.logs;
+      swaps += s.swaps;
+    }
+    return c.json({ from: from.toString(), to: to.toString(), next: to < end ? (to + 1n).toString() : null, logs, swaps });
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+});
+
 // Dev: resolve one token's icon and socials right now (full launchpad read) and return what was found.
 app.post('/admin/metadata/token/:address', async (c) => {
   const sql = postgres(dbUrl(c.env), { max: 1, fetch_types: false, prepare: false });
