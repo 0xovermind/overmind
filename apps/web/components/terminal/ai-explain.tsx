@@ -8,6 +8,7 @@ import { Sparkle } from '@phosphor-icons/react';
 import { auth } from '@/lib/auth';
 import { V1 } from '@/lib/members';
 import { OVHIVE_BUY_URL, usePro } from '@/lib/pro';
+import { AskHive } from './ai-bits';
 
 interface Read { text: string; at: string; cached: boolean }
 
@@ -61,6 +62,7 @@ export function AiExplain({ token }: { token: string }) {
         )}
       </div>
       {err && <p className="mt-2 text-xs text-[#ff5d6c]">{err}</p>}
+      <AskHive token={token} />
       {read && (
         <div className="mt-2 space-y-1.5 text-xs leading-relaxed">
           {lines.map((l, i) =>

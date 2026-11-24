@@ -8,6 +8,7 @@ import { usd } from '@/lib/format';
 import { V1 } from '@/lib/members';
 import { loadPro, OVHIVE_BUY_URL, PRO_MIN_DEFAULT, usePro } from '@/lib/pro';
 import { TokenAvatar } from './bits';
+import { SignalWhy } from './ai-bits';
 
 interface Signal {
   id: string; token: string; kind: 'flip' | 'new'; side: 'buying' | 'selling'; score: number;
@@ -60,6 +61,7 @@ function Row({ s }: { s: Signal }) {
           <div className="text-[10px] text-muted">since signal</div>
         </div>
       </Link>
+      <SignalWhy id={s.id} />
     </li>
   );
 }

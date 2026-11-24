@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { appShare } from '@/lib/share';
 import { asScope, dailyDate, getDaily, mcap, signedUsd, type DailyRow, type Scope } from '@/lib/daily';
 import { TokenAvatar } from '@/components/terminal/bits';
+import { DailyRecap } from '@/components/terminal/ai-bits';
 
 export const metadata: Metadata = appShare(
   'Hive Daily',
@@ -81,6 +82,7 @@ export default async function DailyPage({ searchParams }: { searchParams: Promis
             <a href={`/daily/image${scope === 'all' ? '?scope=all' : ''}`} target="_blank" rel="noopener noreferrer" className="pro-buy rounded-md px-3 py-1.5 text-xs font-semibold">Share image</a>
           </div>
         </div>
+        {d && <DailyRecap scope={scope} />}
         {d ? (
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <Col title="Buying" rows={d.buying} buy />

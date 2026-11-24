@@ -27,6 +27,7 @@ import { hydrator } from './hydrator';
 import { applyLiftGraduations, liftGraduated, syncLiftProgress } from './liftfun';
 import { checkWatched } from './watch';
 import { checkWalletWatch } from './wallet-watch';
+import { agentCall } from './ai-agent';
 import { detectHiveSignals } from './signals-hive';
 
 /** Follow-up delays for launch metadata that wasn't loadable on the first try. */
@@ -367,6 +368,16 @@ app.post('/admin/holders/backfill', async (c) => {
 // Re-read tokens' whole Transfer history from the chain and add what's missing (gaps left while the
 // indexer was down). Idempotent: transfers already stored are skipped, balances move only for new ones.
 // ?tokens=a,b and/or ?top=N (by 24h volume, max 100).
+// Run @overmind_ai's call now (it also runs every 4 hours from the cron).
+app.post('/admin/ai/agent-call', async (c) => {
+  const sql = postgres(dbUrl(c.env), { max: 1, fetch_types: false, prepare: false });
+  try {
+    return c.json({ posted: await agentCall(sql, (c.env as { DEEPSEEK_API_KEY?: string }).DEEPSEEK_API_KEY) });
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+});
+
 app.post('/admin/transfers/resync', async (c) => {
   const sql = postgres(dbUrl(c.env), { max: 2, fetch_types: false, prepare: false });
   try {
@@ -533,6 +544,18 @@ export default {
         if (moved.length) console.log(`supply: ${changes.length} read, ${moved.length} changed (${moved.slice(0, 5).map((x) => x.symbol).join(', ')})`);
       } catch (err) {
         console.error('supply refresh failed', err);
+      } finally {
+        await sql.end({ timeout: 5 });
+      }
+    }
+    // Every 4 hours (at :17): @overmind_ai posts one call on the Pons token with the clearest hive read (ai-agent.ts).
+    if (minute === 17 && new Date(event.scheduledTime).getUTCHours() % 4 === 0) {
+      const sql = postgres(dbUrl(env), { max: 1, fetch_types: false, prepare: false });
+      try {
+        const posted = await agentCall(sql, (env as { DEEPSEEK_API_KEY?: string }).DEEPSEEK_API_KEY);
+        if (posted) console.log(`overmind_ai call: ${posted}`);
+      } catch (err) {
+        console.error('overmind_ai call failed', err);
       } finally {
         await sql.end({ timeout: 5 });
       }
