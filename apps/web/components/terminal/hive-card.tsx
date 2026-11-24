@@ -22,6 +22,7 @@ function useCount(target: number) {
 import { API_URL } from '@/lib/api';
 import { HiveHistory } from './hive-history';
 import { AiExplain } from './ai-explain';
+import { CrowdVote } from './crowd-vote';
 
 interface Consensus {
   smart_buyers: number;
@@ -82,6 +83,7 @@ export function HiveCard({ token }: { token: string }) {
           </dl>
         </>
       )}
+      <CrowdVote token={token} />
       <HiveHistory token={token} />
       <AiExplain token={token} />
     </section>
