@@ -6,27 +6,23 @@
 <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <header>
-    <div class="brand"><img src="icons/32.png" alt=""><b>Overmind</b><span class="live"><i></i>live</span></div>
-    <a class="site" id="site" href="https://overmind.ink/?ref=extension" target="_blank" title="Open overmind.ink">↗</a>
+  <header class="bar">
+    <div class="brand"><img src="icons/32.png" alt=""><span>Overmind</span></div>
+    <span class="live"><i></i>Live</span>
+    <a class="iconbtn" href="https://overmind.ink/?ref=extension" title="Open overmind.ink"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>
   </header>
 
-  <section class="hero" id="hero">
-    <div class="kicker" id="heroKicker">THE HIVE · LAST 24H</div>
-    <div class="big" id="heroBig">…</div>
-    <div class="subline" id="heroSub">Reading the hive</div>
-  </section>
+  <main id="screen"></main>
 
-  <nav class="actions">
-    <button data-view="buying" class="on"><span class="ic">▲</span>Buying</button>
-    <button data-view="selling"><span class="ic">▼</span>Selling</button>
-    <button data-view="signals"><span class="ic">⚡</span>Signals</button>
-    <button data-view="dna"><span class="ic">🧬</span>DNA</button>
+  <nav class="tabs" id="tabs">
+    <button data-s="home" class="on"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg><span>Home</span></button>
+    <button data-s="radar"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><path d="M12 12l5.5-5.5"/></svg><span>Radar</span></button>
+    <button data-s="discover"><svg viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="16" rx="3"/><path d="M3 7v10M21 7v10"/></svg><span>Discover</span></button>
+    <button data-s="feed"><svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h9"/></svg><span>Feed</span></button>
+    <button data-s="token"><svg viewBox="0 0 24 24"><path d="M5 17a8 8 0 1 1 14 0"/><path d="M12 13l3-4"/></svg><span>Token</span></button>
   </nav>
 
-  <main id="view"></main>
-
-  <footer>Public on-chain data · not financial advice</footer>
+  <div class="sheet" id="sheet" hidden><div class="sheet-body" id="sheetBody"></div></div>
   <script src="popup.js"></script>
 </body>
 </html>
