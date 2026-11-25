@@ -52,7 +52,7 @@
   `;
   const LOGO = (s) => `<svg width="${s}" height="${s}" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="none" stroke="#1c1c1e" stroke-width="9"/><circle cx="50" cy="50" r="21" fill="none" stroke="#1c1c1e" stroke-width="9"/><circle cx="50" cy="50" r="7" fill="#1c1c1e"/></svg>`;
 
-  let host, root, current = null, timer = null, collapsed = false, pos = null;
+  let host, root, current = null, timer = null, collapsed = false, pos = null, dragging = false, pending = null;
   const DEFAULT = location.hostname === 'dexscreener.com' ? { top: 108, right: 352 } : { top: 14, right: 24 };
   try { pos = JSON.parse(localStorage.getItem('overmind-pos') || 'null'); } catch {}
   const place = (el) => { const p = pos ?? DEFAULT; el.style.top = Math.max(0, Math.min(innerHeight - 60, p.top)) + 'px'; el.style.right = Math.max(0, Math.min(innerWidth - 60, p.right)) + 'px'; };
@@ -60,9 +60,9 @@
     handle.addEventListener('pointerdown', (e) => {
       if (e.target.closest('a,button')) return;
       const r = el.getBoundingClientRect(), dx = e.clientX - r.left, dy = e.clientY - r.top;
-      handle.setPointerCapture(e.pointerId);
+      handle.setPointerCapture(e.pointerId); dragging = true;
       const move = (ev) => { pos = { top: ev.clientY - dy, right: innerWidth - (ev.clientX - dx) - r.width }; place(el); };
-      const up = () => { handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', up); try { localStorage.setItem('overmind-pos', JSON.stringify(pos)); } catch {} };
+      const up = () => { handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', up); dragging = false; try { localStorage.setItem('overmind-pos', JSON.stringify(pos)); } catch {} if (pending) { const st = pending; pending = null; render(st); } };
       handle.addEventListener('pointermove', move); handle.addEventListener('pointerup', up);
     });
   }
@@ -77,6 +77,8 @@
   function unmount() { host?.remove(); host = null; current = null; clearInterval(timer); timer = null; }
 
   function render(state) {
+    // a refresh that lands mid-drag waits until the card is dropped, so it never jumps back
+    if (dragging) { pending = state; return; }
     mount();
     if (collapsed) {
       root.innerHTML = `<style>${CSS}</style><button class="mini" title="Show Overmind">${LOGO(22)}</button>`;
