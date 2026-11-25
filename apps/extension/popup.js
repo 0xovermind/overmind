@@ -13,6 +13,17 @@ const hex = (s) => (s >= 20 ? '#34d399' : s > -20 ? '#8b8b96' : '#f87171');
 const verdict = (s) => (s >= 60 ? 'Smart money is buying' : s >= 20 ? 'Leaning in' : s > -20 ? 'Split' : s > -60 ? 'Leaning out' : 'Smart money is selling');
 const money = (n) => (n == null ? '–' : n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${(n / 1e3).toFixed(1)}K` : `$${Math.round(n)}`);
 const signed = (n) => `${n > 0 ? '+' : ''}${Math.round(n)}`;
+// a number that counts up from zero when it appears
+const cnt = (n, sign = true) => `<span data-n="${Math.round(n)}" data-s="${sign ? 1 : 0}">${sign ? signed(n) : Math.round(n)}</span>`;
+function countUp(root) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  for (const el of root.querySelectorAll('[data-n]:not([data-done])')) {
+    el.dataset.done = 1; const to = +el.dataset.n, sign = el.dataset.s === '1', t0 = performance.now(), dur = 750;
+    const tick = (t) => { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3), v = Math.round(to * e); el.textContent = sign ? signed(v) : String(v); if (k < 1) requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+  }
+}
+new MutationObserver(() => countUp(document.body)).observe(document.body, { childList: true, subtree: true });
 const ago = (iso) => { const m = Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 60000)); return m < 60 ? `${m}m ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`; };
 const img = (u) => (u ? `https://overmind.ink/api/img?u=${encodeURIComponent(u)}` : null);
 const icon = (t, cls = '') => {
@@ -52,7 +63,8 @@ function go(name) {
   current = name;
   for (const b of document.querySelectorAll('#tabs button')) b.classList.toggle('on', b.dataset.s === name);
   $('#screen').scrollTop = 0;
-  $('#screen').innerHTML = `<div class="empty">Loading…</div>`;
+  $('#screen').innerHTML = `<div class="stack"><div class="skel" style="height:46px"></div><div class="skel" style="height:128px"></div><div class="grid2"><div class="skel" style="height:150px"></div><div class="skel" style="height:150px"></div></div><div class="skel" style="height:90px"></div></div>`;
+  const idx = Object.keys(screens).indexOf(name); $('#ind').style.transform = `translateX(${idx * 100}%)`;
   screens[name]().catch(() => { if (current === name) $('#screen').innerHTML = `<div class="empty">Overmind is not reachable right now.</div>`; });
 }
 for (const b of document.querySelectorAll('#tabs button')) b.onclick = () => { if (b.dataset.s === 'token') picked = null; go(b.dataset.s); };
@@ -63,7 +75,7 @@ document.addEventListener('click', (e) => { const el = e.target.closest('[data-t
 const gaugeHalf = (f) => {
   const a = Math.PI * (1 - Math.max(0.02, Math.min(0.98, f))), x = 48 + 38 * Math.cos(a), y = 46 - 38 * Math.sin(a);
   return `<svg viewBox="0 0 96 54" style="width:96px;height:54px;flex:none"><path d="M10 46 A38 38 0 0 1 86 46" stroke="#26262f" stroke-width="8" fill="none" stroke-linecap="round"/>
-    <path d="M10 46 A38 38 0 0 1 ${x.toFixed(1)} ${y.toFixed(1)}" stroke="#34d399" stroke-width="8" fill="none" stroke-linecap="round"/></svg>`;
+    <path class="draw" pathLength="100" d="M10 46 A38 38 0 0 1 ${x.toFixed(1)} ${y.toFixed(1)}" stroke="#34d399" stroke-width="8" fill="none" stroke-linecap="round"/></svg>`;
 };
 async function home() {
   const [b, live, sg, st] = await Promise.all([board(), liveTokens(), signals(), stats()]);
@@ -73,7 +85,7 @@ async function home() {
   const s0 = (sg.signals ?? [])[0];
   const tile = (t, label) => (t ? `<div class="card tile" data-token="${t.token}"><div class="label">${label}</div>
       <div class="who">${icon(t, 'sm')}<span>$${esc(t.symbol)}</span></div>
-      <div class="big num ${tone(t.score)}">${signed(t.score)}</div><div class="sub">${t.smart_buyers} buying · ${t.smart_sellers} selling</div></div>`
+      <div class="big num ${tone(t.score)}">${cnt(t.score)}</div><div class="sub">${t.smart_buyers} buying · ${t.smart_sellers} selling</div></div>`
     : `<div class="card tile"><div class="label">${label}</div><div class="sub" style="margin-top:12px">Nothing clear yet</div></div>`);
   if (current !== 'home') return;
   $('#screen').innerHTML = `<div class="stack">
@@ -109,7 +121,7 @@ async function radar() {
   const hit = (q) => boxes.some((o) => q.x < o.x + o.w && q.x + q.w > o.x && q.y < o.y + o.h && q.y + q.h > o.y);
   const labels = [];
   for (const b of blips) {
-    const w = 6.4 * b.t.symbol.length + 4, h = 12;
+    const w = 6.6 * b.t.symbol.length + 8, h = 14;
     const spots = [[b.x + b.d + 4, b.y - 6], [b.x - b.d - 4 - w, b.y - 6], [b.x - w / 2, b.y - b.d - 15], [b.x - w / 2, b.y + b.d + 3]];
     const spot = spots.find(([x, y]) => x >= 2 && x + w <= S - 2 && y >= 2 && y + h <= S - 2 && !hit({ x, y, w, h }));
     if (spot) { boxes.push({ x: spot[0], y: spot[1], w, h }); labels.push(`<text x="${(spot[0] + 2).toFixed(1)}" y="${(spot[1] + 9.5).toFixed(1)}">${esc(b.t.symbol)}</text>`); }
@@ -123,7 +135,9 @@ async function radar() {
       <circle cx="${C}" cy="${C}" r="${R}" fill="url(#rg)" stroke="#26262f"/>
       ${[0.68, 0.36].map((k) => `<circle cx="${C}" cy="${C}" r="${R * k}" fill="none" stroke="#26262f" stroke-dasharray="2 4"/>`).join('')}
       <path d="M${C - R} ${C}H${C + R}M${C} ${C - R}V${C + R}" stroke="#1c1c23"/>
-      ${blips.map((b) => `<circle class="blip" data-token="${b.t.token}" cx="${b.x.toFixed(1)}" cy="${b.y.toFixed(1)}" r="${b.d}" fill="${hex(b.t.score)}" fill-opacity=".9" stroke="#0b0b0f" stroke-width="2"><title>$${esc(b.t.symbol)} ${signed(b.t.score)}</title></circle>`).join('')}
+      <defs><linearGradient id="sw" x1="0" x2="1"><stop offset="0" stop-color="#34d399" stop-opacity="0"/><stop offset="1" stop-color="#34d399" stop-opacity=".14"/></linearGradient></defs>
+      <g class="sweep"><path d="M${C} ${C} L${C + R} ${C} A${R} ${R} 0 0 0 ${(C + R * Math.cos(-0.8)).toFixed(1)} ${(C + R * Math.sin(-0.8)).toFixed(1)}  Z" fill="url(#sw)" stroke="none"/><line x1="${C}" y1="${C}" x2="${C + R}" y2="${C}" stroke="#34d399" stroke-opacity=".35" stroke-width="1"/></g>
+      ${blips.map((b, i) => `<circle class="blip" style="animation-delay:${(0.15 + i * 0.04).toFixed(2)}s" data-token="${b.t.token}" cx="${b.x.toFixed(1)}" cy="${b.y.toFixed(1)}" r="${b.d}" fill="${hex(b.t.score)}" fill-opacity=".9" stroke="#0b0b0f" stroke-width="2"><title>$${esc(b.t.symbol)} ${signed(b.t.score)}</title></circle>`).join('')}
       ${labels.join('')}
       <circle cx="${C}" cy="${C}" r="3" fill="#f2f2f5"/></svg></div>
     <div class="label" style="margin:8px 0 4px">Closest to the centre</div>
@@ -146,7 +160,7 @@ function drawCard() {
       <span class="count">${(at % deck.length) + 1} / ${deck.length}</span>
       ${icon(t, 'lg')}
       <div class="name">$${esc(t.symbol)}</div><div class="meta">${esc(t.name || '')} · ${money(t.market_cap_usd)}</div>
-      <div class="score ${tone(s)}">${signed(s)}</div><div class="verdict ${tone(s)}">${verdict(s)}</div>
+      <div class="score ${tone(s)}">${cnt(s)}</div><div class="verdict ${tone(s)}">${verdict(s)}</div>
       <div class="pills"><span class="pill"><span class="up">●</span>${t.smart_buyers} buying</span><span class="pill"><span class="down">●</span>${t.smart_sellers} selling</span></div>
       <div class="actions"><button class="btn ghost" id="skip">Skip</button><a class="btn ${s >= 20 ? 'go' : 'primary'}" href="${pons(t.token)}">Open on Pons</a></div>
     </div></div>
@@ -195,16 +209,18 @@ async function token() {
   const [rl, rc, rf] = RISK[f?.risk] ?? ['Not checked', '#8b8b96', 0];
   const fromTab = !picked;
   const reasons = (f?.reasons ?? []).slice(0, 2).map((x) => esc(x.text)).join(' · ');
+  const v = overmindVerdict(c, f, MIN_VOTERS);
   $('#screen').innerHTML = `<div class="stack">
+    <div class="vline ${v.tone}"><span class="vi">${v.icon}</span><span>${esc(v.text)}</span></div>
     <div class="tokhead">${icon(c ?? { symbol: '?' }, 'sm')}<span class="t">${c?.symbol ? `$${esc(c.symbol)}` : `${r.token.slice(0, 6)}…${r.token.slice(-4)}`}</span><span class="pill">${fromTab ? 'This tab' : money(c?.market_cap_usd)}</span></div>
     <div class="gauge"><svg viewBox="0 0 248 200">
       <defs><linearGradient id="gg" x1="0" x2="1"><stop offset="0" stop-color="#f87171"/><stop offset=".5" stop-color="#8b8b96"/><stop offset="1" stop-color="#34d399"/></linearGradient></defs>
       <path d="${arc(124, 118, 100, 135, 270)}" stroke="#1c1c23" stroke-width="16" fill="none" stroke-linecap="round"/>
-      ${has ? `<path d="${arc(124, 118, 100, 135, ((s + 100) / 200) * 270)}" stroke="url(#gg)" stroke-width="16" fill="none" stroke-linecap="round"/>` : ''}
+      ${has ? `<path class="draw" pathLength="100" d="${arc(124, 118, 100, 135, ((s + 100) / 200) * 270)}" stroke="${hex(s)}" stroke-width="16" fill="none" stroke-linecap="round"/>` : ''}
       <path d="${arc(124, 118, 80, 135, 270)}" stroke="#1c1c23" stroke-width="5" fill="none" stroke-linecap="round"/>
-      ${rf ? `<path d="${arc(124, 118, 80, 135, 270 * rf)}" stroke="${rc}" stroke-width="5" fill="none" stroke-linecap="round"/>` : ''}</svg>
-      <div class="center">${has ? `<div class="score ${tone(s)}">${signed(s)}</div><div class="verdict ${tone(s)}">${verdict(s)}</div>` : `<div class="score flat" style="font-size:30px">No score</div><div class="verdict flat">${c ? c.smart_buyers + c.smart_sellers : 0} smart wallets in 24h</div>`}</div></div>
-    <div class="stats3"><div class="stat"><div class="label">Buying</div><div class="v up">${c?.smart_buyers ?? 0}</div></div><div class="stat"><div class="label">Selling</div><div class="v down">${c?.smart_sellers ?? 0}</div></div><div class="stat"><div class="label">Mcap</div><div class="v">${money(c?.market_cap_usd)}</div></div></div>
+      ${rf ? `<path class="draw" pathLength="100" d="${arc(124, 118, 80, 135, 270 * rf)}" stroke="${rc}" stroke-width="5" fill="none" stroke-linecap="round"/>` : ''}</svg>
+      <div class="center">${has ? `<div class="score ${tone(s)}">${cnt(s)}</div><div class="verdict ${tone(s)}">${verdict(s)}</div>` : `<div class="score flat" style="font-size:30px">No score</div><div class="verdict flat">${c ? c.smart_buyers + c.smart_sellers : 0} smart wallets in 24h</div>`}</div></div>
+    <div class="stats3"><div class="stat"><div class="label">Buying</div><div class="v up">${cnt(c?.smart_buyers ?? 0, false)}</div></div><div class="stat"><div class="label">Selling</div><div class="v down">${cnt(c?.smart_sellers ?? 0, false)}</div></div><div class="stat"><div class="label">Mcap</div><div class="v">${money(c?.market_cap_usd)}</div></div></div>
     <div class="card"><div class="risk"><span class="dot" style="background:${rc}"></span><b>${rl}</b><span class="muted" style="margin-left:auto;font-size:12px">inner ring</span></div>
       ${f ? `<div class="why">Top 10 hold ${Math.round(f.top10Pct ?? 0)}% · snipers ${Math.round(f.snipersPct ?? 0)}% · bundle ${Math.round(f.bundledPct ?? 0)}% · dev rugs ${f.dev?.rugs ?? 0}${reasons ? `<br>${reasons}` : ''}</div>` : ''}</div>
     <div class="card ai" id="ai"><div class="risk"><b>Overmind AI</b></div><button class="btn ghost" id="explain" style="width:100%;margin-top:12px">Explain this token</button></div>

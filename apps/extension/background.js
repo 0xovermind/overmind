@@ -82,6 +82,9 @@ const handlers = {
   },
 };
 
+// First install: open the welcome page that explains what the extension does and where to look.
+chrome.runtime.onInstalled?.addListener((d) => { if (d.reason === 'install') chrome.tabs.create({ url: chrome.runtime.getURL('welcome.html') }); });
+
 chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
   const h = handlers[msg?.type];
   if (!h) return false;

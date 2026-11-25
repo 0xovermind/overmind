@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Welcome to Overmind</title>
+<link rel="stylesheet" href="welcome.css">
+</head>
+<body>
+<main>
+  <div class="brand"><img src="icons/128.png" alt=""><span>Overmind</span></div>
+
+  <h1>Before you buy a token,<br><span class="grad">know who's on the other side.</span></h1>
+  <p class="lead">Overmind watches the ~300 most profitable wallets on Robinhood Chain and checks every token for snipers, bundles and dev rugs. This extension puts that answer right on Pons and DexScreener, in one line.</p>
+
+  <section class="step">
+    <div class="n">1</div>
+    <div class="txt"><h2>Open any token on Pons or DexScreener</h2>
+      <p>A small Overmind card appears in the top-right corner of the page. Nothing to click, nothing to sign in to.</p></div>
+    <img class="shot" src="welcome/card.png" alt="The Overmind card on a Pons token page">
+  </section>
+
+  <section class="step noimg">
+    <div class="n">2</div>
+    <div class="txt"><h2>Read the first line. That's the answer.</h2>
+      <p>It combines what smart money is doing with the safety check, in plain words:</p>
+      <div class="vline good"><span class="vi">✓</span>Smart money is buying and there are no red flags.</div>
+      <div class="vline warn"><span class="vi">!</span>Smart money is buying, but watch out: snipers bought 24% in the first seconds.</div>
+      <div class="vline bad"><span class="vi">↓</span>Smart money is leaving this token.</div>
+      <div class="vline neutral"><span class="vi">…</span>Too early: smart money hasn't really traded it yet. No red flags so far.</div>
+      <p class="small">Want details? The tabs under it show the score, the safety check, which smart wallets hold it, and Overmind AI's read.</p></div>
+  </section>
+
+  <section class="step">
+    <div class="n">3</div>
+    <div class="txt"><h2>See who is trading, right in the list</h2>
+      <p>Wallets in the page's trades and holders get labels. Point at a label to see what it means, point at a name for that wallet's DNA.</p>
+      <div class="labels"><div><span class="lb s">🧠 #12</span>one of the most profitable wallets on the chain</div>
+        <div><span class="lb d">DEV</span>the wallet that created the token</div>
+        <div><span class="lb sn">SNIPER</span>bought in the first seconds of the launch</div></div></div>
+    <img class="shot" src="welcome/labels.png" alt="Wallet labels in the Pons trade list">
+  </section>
+
+  <section class="step">
+    <div class="n">4</div>
+    <div class="txt"><h2>Pin the icon for the whole hive</h2>
+      <p>Click the puzzle piece <b>🧩</b> next to the address bar, then the pin next to Overmind. Its window shows what smart money is buying and dumping right now, a radar, a live feed, and Wallet DNA for any address.</p></div>
+    <img class="shot narrow" src="welcome/popup.png" alt="The Overmind toolbar window">
+  </section>
+
+  <div class="cta">
+    <a class="btn" id="try" href="https://ponsfamily.com/">Try it on a live token</a>
+    <span class="small" id="tryHint">Opens the token smart money is buying hardest right now.</span>
+  </div>
+  <p class="foot">Overmind reads public on-chain data. It is not financial advice. The extension only reads token and wallet addresses already on the page, and stores nothing about you.</p>
+</main>
+<script src="welcome.js"></script>
+</body>
+</html>

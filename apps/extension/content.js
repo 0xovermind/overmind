@@ -45,7 +45,12 @@
       background: rgba(12,12,16,.95); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,.1);
       border-radius: 16px; box-shadow: 0 18px 50px rgba(0,0,0,.5); padding: 10px 12px 11px; }
     .card.in { animation: in .35s cubic-bezier(.16,1,.3,1) both; }
-    @keyframes in { from { opacity: 0; transform: translateY(-8px); } }
+    @keyframes in { from { opacity: 0; transform: translateY(-10px) scale(.97); } }
+    .card.in .vline { animation: fade .5s ease .15s both; } .card.in .tabs { animation: fade .5s ease .25s both; } .card.in .pane { animation: fade .5s ease .3s both; }
+    @keyframes fade { from { opacity: 0; transform: translateY(6px); } }
+    .card.in .bar i { animation: slide 1s cubic-bezier(.2,.8,.2,1) .3s both; } @keyframes slide { from { left: 50%; } }
+    .tabs button { transition: background .2s, color .2s; }
+    @media (prefers-reduced-motion: reduce) { .card *, .card { animation: none !important; transition: none !important; } }
     .top { display: flex; align-items: center; gap: 8px; cursor: grab; user-select: none; } .top:active { cursor: grabbing; }
     .logo { width: 22px; height: 22px; border-radius: 50%; background: #e6e5e0; display: grid; place-items: center; flex: none; }
     .brand { font-weight: 700; letter-spacing: -.01em; }
@@ -54,6 +59,12 @@
     .x:hover { color: #fff; }
     a.open { margin-left: auto; text-decoration: none; font-weight: 600; font-size: 11px; color: #ececf1; border: 1px solid rgba(255,255,255,.16); border-radius: 999px; padding: 3px 9px; }
     a.open:hover { background: rgba(255,255,255,.1); }
+    .vline { display: flex; gap: 9px; align-items: flex-start; margin-top: 10px; padding: 9px 10px; border-radius: 11px; font-size: 12.5px; line-height: 1.38; font-weight: 600; }
+    .vline .vi { flex: none; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; margin-top: 0; }
+    .vline.good { background: rgba(61,220,151,.1); color: #c9f5e2; } .vline.good .vi { background: #3ddc97; color: #04130c; }
+    .vline.warn { background: rgba(255,181,71,.1); color: #ffe2b8; } .vline.warn .vi { background: #ffb547; color: #1a1000; }
+    .vline.bad { background: rgba(255,93,108,.1); color: #ffd0d5; } .vline.bad .vi { background: #ff5d6c; color: #1a0004; }
+    .vline.neutral { background: rgba(255,255,255,.05); color: #d9d9df; } .vline.neutral .vi { background: rgba(255,255,255,.18); color: #fff; }
     .tabs { display: flex; gap: 2px; margin-top: 9px; padding: 2px; border-radius: 9px; background: rgba(255,255,255,.05); }
     .tabs button { flex: 1; border: 0; background: none; color: rgba(236,236,241,.6); font: 600 11px/1 Inter, system-ui, sans-serif; padding: 6px 0; border-radius: 7px; cursor: pointer; }
     .tabs button.on { background: rgba(255,255,255,.12); color: #fff; }
@@ -94,10 +105,11 @@
   `;
   const LOGO = (s) => `<svg width="${s}" height="${s}" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="none" stroke="#1c1c1e" stroke-width="9"/><circle cx="50" cy="50" r="21" fill="none" stroke="#1c1c1e" stroke-width="9"/><circle cx="50" cy="50" r="7" fill="#1c1c1e"/></svg>`;
   // the labels put next to the page's wallet links (plain inline styles: they live in the page's DOM)
+  // [label, colour, tooltip title, what it means for you]
   const BADGE = {
-    smart: (r) => [`🧠 #${r.rank}`, '#3ddc97', `Overmind smart money: #${r.rank} of the most profitable wallets on Robinhood Chain (${usd(r.realizedUsd)} realized)`],
-    dev: () => ['DEV', '#ff5d6c', 'The wallet that deployed this token'],
-    sniper: () => ['SNIPER', '#ffb547', 'Bought this token in its launch seconds'],
+    smart: (r) => [`🧠 #${r.rank}`, '#3ddc97', `Smart money #${r.rank}`, `One of the ~300 most profitable wallets on Robinhood Chain (${usd(r.realizedUsd)} realized). When they buy, it is worth noticing. When they sell, too.`],
+    dev: () => ['DEV', '#ff5d6c', 'The dev', 'The wallet that created this token. Watch it: when the dev sells, the price usually drops.'],
+    sniper: () => ['SNIPER', '#ffb547', 'Launch sniper', 'Bought in the first seconds of the launch, before almost anyone. Snipers often sell into the first pump.'],
   };
 
   // ---------- state ----------
@@ -191,7 +203,9 @@
       const tabs = [['hive', 'Hive', hasScore ? color(s) : null], ['safety', 'Safety', riskCol], ['wallets', 'Wallets', null], ['ai', 'AI', null]]
         .map(([id, name, dot]) => `<button data-tab="${id}" class="${tab === id ? 'on' : ''}">${name}${dot ? `<span class="dot" style="background:${dot}"></span>` : ''}</button>`).join('');
       const pane = { hive: hivePane, safety: safetyPane, wallets: walletsPane, ai: aiPane }[tab]();
-      body = `<div class="tabs">${tabs}</div><div class="pane">${pane}</div>
+      const v = overmindVerdict(state.consensus, state.safety, MIN_VOTERS);
+      body = `<div class="vline ${v.tone}"><span class="vi">${v.icon}</span><span>${esc(v.text)}</span></div>
+        <div class="tabs">${tabs}</div><div class="pane">${pane}</div>
         <div class="legend"><span style="color:#3ddc97">🧠 smart money</span>·<span style="color:#ff5d6c">DEV</span>·<span style="color:#ffb547">SNIPER</span><span>labelled on the page</span></div>`;
     }
     root.innerHTML = `<style>${CSS}</style>
@@ -201,6 +215,11 @@
         ${body}
       </div>
       <div class="tip" hidden></div>`;
+    // on a fresh card the score counts up from zero
+    if (state.fresh && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      const el = root.querySelector('.score'), to = el ? parseInt(el.textContent, 10) : NaN;
+      if (!Number.isNaN(to)) { const t0 = performance.now(); const tick = (t) => { const k = Math.min(1, (t - t0) / 800), v = Math.round(to * (1 - Math.pow(1 - k, 3))); el.textContent = (v > 0 ? '+' : '') + v; if (k < 1) requestAnimationFrame(tick); }; requestAnimationFrame(tick); }
+    }
     state.fresh = false;
     const card = root.querySelector('.card'); place(card); draggable(card, root.querySelector('.top'));
     root.querySelector('.x').onclick = () => { collapsed = true; try { sessionStorage.setItem('overmind-collapsed', '1'); } catch {} render(); };
@@ -264,9 +283,11 @@
       a.dataset.omLabel = w;
       const l = labelFor(w);
       if (!l) continue;
-      const [text, col, title] = l;
+      const [text, col, title, meaning] = l;
       const span = document.createElement('span');
-      span.className = 'om-label'; span.textContent = text; span.title = title;
+      span.className = 'om-label'; span.textContent = text;
+      span.addEventListener('mouseenter', () => labelTip(span, col, title, meaning));
+      span.addEventListener('mouseleave', hideTip);
       span.style.cssText = `display:inline-block;margin-left:5px;padding:1px 5px;border-radius:5px;font:700 10px/1.5 ui-monospace,Menlo,monospace;letter-spacing:.02em;vertical-align:1px;white-space:nowrap;color:${col};background:${col}22;border:1px solid ${col}55`;
       a.insertAdjacentElement('afterend', span);
     }
@@ -275,6 +296,16 @@
   // ---------- Wallet DNA on hover ----------
   let tipTimer = null, tipFor = null;
   const dnaCache = new Map();
+  /** What a wallet label means, shown when you point at it. */
+  function labelTip(span, col, title, meaning) {
+    clearTimeout(tipTimer); tipFor = null;
+    const t = root?.querySelector('.tip'); if (!t) return;
+    const r = span.getBoundingClientRect();
+    t.style.left = Math.min(innerWidth - 262, Math.max(8, r.left)) + 'px';
+    t.style.top = (r.bottom + 130 > innerHeight ? r.top - 110 : r.bottom + 6) + 'px';
+    t.innerHTML = `<div class="tag">OVERMIND LABEL</div><div class="name" style="color:${col}">${esc(title)}</div><div class="line">${esc(meaning)}</div><div class="line" style="margin-top:6px;font-size:11px">Point at the wallet's name for its DNA.</div>`;
+    t.hidden = false;
+  }
   function hideTip() { clearTimeout(tipTimer); tipFor = null; const t = root?.querySelector('.tip'); if (t) t.hidden = true; }
   function hoverWallet(a, w) {
     clearTimeout(tipTimer); tipFor = w;
