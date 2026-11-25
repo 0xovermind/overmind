@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Overmind for your browser</title>
+<meta name="description" content="The Overmind hive score on every Pons and DexScreener token page. Free, no tracking.">
+<meta property="og:title" content="Overmind for your browser">
+<meta property="og:description" content="See what the smartest wallets on Robinhood Chain are doing, right on Pons and DexScreener.">
+<meta property="og:image" content="https://overmind.ink/extension/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #07070a; color: #ececf1; font: 17px/1.55 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .bg { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(40% 50% at 75% 20%, rgba(240,107,168,.16), transparent 70%), radial-gradient(40% 55% at 0% 100%, rgba(120,186,230,.12), transparent 70%); }
+  main { position: relative; max-width: 1080px; margin: 0 auto; padding: 40px 20px 80px; }
+  .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; text-decoration: none; color: #ececf1; font-size: 18px; }
+  .tag { margin-top: 64px; font: 13px ui-monospace, Menlo, monospace; letter-spacing: .14em; color: rgba(236,236,241,.55); }
+  h1 { margin: 14px 0 0; font-size: clamp(42px, 7vw, 72px); line-height: 1.03; letter-spacing: -.045em; }
+  h1 span { background: linear-gradient(100deg, #facb0e, #f06ba8 45%, #78bae6); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lead { max-width: 620px; margin-top: 20px; font-size: 20px; color: rgba(236,236,241,.68); }
+  .cta { margin-top: 30px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .btn { display: inline-block; padding: 13px 20px; border-radius: 12px; font-weight: 600; text-decoration: none; }
+  .btn.main { background: #ececf1; color: #0b0b0f; }
+  .btn.ghost { border: 1px solid rgba(255,255,255,.16); color: #ececf1; }
+  .shot { margin-top: 48px; width: 100%; border-radius: 18px; border: 1px solid rgba(255,255,255,.1); }
+  .grid { margin-top: 48px; display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+  .grid div { padding: 20px; border-radius: 16px; background: #0d0d12; border: 1px solid rgba(255,255,255,.09); }
+  .grid b { display: block; font-size: 18px; }
+  .grid span { color: rgba(236,236,241,.6); font-size: 15px; }
+  h2 { margin-top: 56px; font-size: 28px; letter-spacing: -.02em; }
+  ol { padding-left: 22px; color: rgba(236,236,241,.8); }
+  code { font: 14px ui-monospace, Menlo, monospace; background: rgba(255,255,255,.06); padding: 2px 6px; border-radius: 6px; }
+  footer { margin-top: 56px; font-size: 14px; color: rgba(236,236,241,.5); }
+  footer a { color: rgba(236,236,241,.7); }
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<main>
+  <a class="brand" href="/"><svg width="28" height="28" viewBox="0 0 100 100"><circle cx="50" cy="50" r="49" fill="#e6e5e0"/><circle cx="50" cy="50" r="33" fill="none" stroke="#1c1c1e" stroke-width="7"/><circle cx="50" cy="50" r="17" fill="none" stroke="#1c1c1e" stroke-width="7"/><circle cx="50" cy="50" r="6" fill="#1c1c1e"/></svg>overmind</a>
+  <div class="tag">BROWSER EXTENSION · FREE</div>
+  <h1>The hive,<br><span>where you trade.</span></h1>
+  <p class="lead">Open any token on Pons or DexScreener and see what the ~300 most profitable wallets on Robinhood Chain are doing with it. No new tab.</p>
+  <div class="cta">
+    <a class="btn main" id="get" href="/extension/overmind-extension.zip">Download for Chrome, Brave, Edge</a>
+    <a class="btn ghost" href="/extension/privacy">Privacy</a>
+  </div>
+  <img class="shot" src="/extension/readings.png" alt="The Overmind card: smart money buying, selling, or not enough data">
+  <div class="grid">
+    <div><b>Live hive score</b><span>From -100 to +100, refreshed every 30 seconds.</span></div>
+    <div><b>Pons + DexScreener</b><span>Every Robinhood Chain token and launch.</span></div>
+    <div><b>No fake signals</b><span>Under 3 smart wallets or calls, it says so.</span></div>
+    <div><b>Zero tracking</b><span>Reads only the token in the URL. Nothing stored about you.</span></div>
+  </div>
+  <h2>Install</h2>
+  <ol>
+    <li>Download the zip above and unzip it.</li>
+    <li>Open <code>chrome://extensions</code> (Brave: <code>brave://extensions</code>, Edge: <code>edge://extensions</code>).</li>
+    <li>Turn on <b>Developer mode</b>, click <b>Load unpacked</b> and pick the unzipped folder.</li>
+    <li>Open any token on Pons. The Overmind card appears in the corner.</li>
+  </ol>
+  <p class="lead" style="font-size:16px">Chrome Web Store listing coming soon: then it is one click.</p>
+  <footer>Overmind shows public on-chain data. Not financial advice. · <a href="https://x.com/0xovermind">@0xovermind</a></footer>
+</main>
+</body>
+</html>
