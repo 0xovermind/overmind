@@ -24,8 +24,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
       let token = msg.token;
       if (!token && msg.pair) token = await tokenOfPair(msg.pair);
       if (!token) return reply({ ok: true, token: null, consensus: null });
-      const b = await json(`${API}/hive/${token}`);
-      reply({ ok: true, token, consensus: b.consensus ?? null });
+      // the hive reading and the safety check side by side; a token the index lacks has no safety data yet
+      const [hive, safety] = await Promise.all([json(`${API}/hive/${token}`), json(`${API}/tokens/${token}/signals`).catch(() => null)]);
+      reply({ ok: true, token, consensus: hive.consensus ?? null, safety: safety?.data ? { ...safety.data, risk: safety.risk_level ?? safety.data.risk } : null });
     }
   })().catch((e) => reply({ ok: false, error: String(e?.message ?? e) }));
   return true; // async reply

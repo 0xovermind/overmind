@@ -47,6 +47,14 @@
     a.open { text-decoration: none; font-weight: 600; font-size: 11px; color: #ececf1; border: 1px solid rgba(255,255,255,.16); border-radius: 999px; padding: 3px 9px; }
     a.open:hover { background: rgba(255,255,255,.1); }
     .muted { color: rgba(236,236,241,.6); }
+    .sep { height: 1px; margin: 10px 0 8px; background: rgba(255,255,255,.08); }
+    .risk { display: flex; align-items: center; gap: 8px; }
+    .chip { font: 700 10px/1 ui-monospace, Menlo, monospace; letter-spacing: .08em; padding: 4px 7px; border-radius: 6px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin-top: 7px; font-size: 11.5px; }
+    .grid span { color: rgba(236,236,241,.55); display: flex; justify-content: space-between; }
+    .grid b { font: 600 11.5px ui-monospace, Menlo, monospace; color: #ececf1; }
+    .why { margin-top: 6px; font-size: 11.5px; line-height: 1.35; color: rgba(236,236,241,.8); }
+    .why i { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
     .mini { position: fixed; z-index: 2147483000; width: 38px; height: 38px; border-radius: 50%;
       background: #e6e5e0; border: 0; cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,.45); display: grid; place-items: center; }
   `;
@@ -95,7 +103,7 @@
       const traded = c ? c.smart_buyers + c.smart_sellers : 0;
       if (!c || c.voters < MIN_VOTERS) {
         body = `<div class="row"><span class="verdict">Not enough smart money yet</span></div>
-          <div class="sub">${traded ? `Only ${plural(traded, 'wallet')} traded it` : 'No smart wallet traded it'} in the last 24 hours.</div>`;
+          <div class="sub">${traded ? `Only ${plural(traded, 'wallet')} traded it` : 'No smart wallet traded it'} in 24h. A score needs ${MIN_VOTERS}.</div>`;
       } else {
         const s = Math.round(c.score), col = color(s);
         const calls = c.bullish_calls + c.bearish_calls;
@@ -104,6 +112,7 @@
           <div class="sub">${plural(c.smart_buyers, 'wallet')} buying · ${c.smart_sellers} selling${calls ? ` · ${calls} call${calls === 1 ? '' : 's'}` : ''} (24h)</div>`;
       }
     }
+    if (state.safety) body += safetyHtml(state.safety);
     root.innerHTML = `<style>${CSS}</style>
       <div class="card ${state.fresh ? 'in' : ''}">
         <div class="top"><span class="logo">${LOGO(16)}</span><span class="brand">Overmind</span><span class="tag">HIVE</span>
@@ -114,12 +123,26 @@
     root.querySelector('.x').onclick = () => { collapsed = true; try { sessionStorage.setItem('overmind-collapsed', '1'); } catch {} render(state); };
   }
 
+  const RISK = { low: ['LOW RISK', '#3ddc97'], medium: ['MEDIUM RISK', '#ffb547'], high: ['HIGH RISK', '#ff5d6c'] };
+  const pct = (n) => (n == null ? '–' : `${Math.round(n * 10) / 10}%`);
+  const esc = (t) => String(t).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
+  /** The safety check: risk level, the four numbers that matter most, and the reasons behind a medium or high level. */
+  function safetyHtml(f) {
+    const [label, col] = RISK[f.risk] ?? ['NOT CHECKED', '#c9c9d2'];
+    const reasons = (f.reasons ?? []).slice(0, 2)
+      .map((r) => `<div class="why"><i style="background:${r.level === 'high' ? '#ff5d6c' : '#ffb547'}"></i>${esc(r.text)}</div>`).join('');
+    return `<div class="sep"></div>
+      <div class="risk"><span class="chip" style="color:${col};background:${col}1f">${label}</span><span class="tag">SAFETY CHECK</span></div>
+      <div class="grid"><span>Top 10 hold <b>${pct(f.top10Pct)}</b></span><span>Snipers <b>${pct(f.snipersPct)}</b></span>
+        <span>Launch bundle <b>${pct(f.bundledPct)}</b></span><span>Dev rugs <b>${f.dev?.rugs ?? '–'}</b></span></div>${reasons}`;
+  }
+
   function load(t, fresh) {
     chrome.runtime.sendMessage({ type: 'hive', token: t.token, pair: t.pair }, (res) => {
       if (chrome.runtime.lastError || !res) return render({ error: true, fresh });
       if (current !== t.key) return; // the user moved on to another token meanwhile
       if (!res.ok) return render({ error: true, token: t.token, fresh });
-      render({ token: res.token, consensus: res.consensus, fresh });
+      render({ token: res.token, consensus: res.consensus, safety: res.safety, fresh });
     });
   }
 
