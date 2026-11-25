@@ -151,7 +151,7 @@ function drawCard() {
       <div class="actions"><button class="btn ghost" id="skip">Skip</button><a class="btn ${s >= 20 ? 'go' : 'primary'}" href="${pons(t.token)}">Open on Pons</a></div>
     </div></div>
     <div class="muted" style="text-align:center;font-size:11.5px">Strongest readings first · ← → to flip · tap the card for details</div>`;
-  $('#skip').onclick = next;
+  $('#skip').onclick = () => next(1);
 }
 function next(dir = 1) { const c = $('#card'); if (!c) return; c.classList.add('out'); setTimeout(() => { at = (at + dir + deck.length) % deck.length; drawCard(); }, 180); }
 document.addEventListener('keydown', (e) => { if (current === 'discover' && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) next(e.key === 'ArrowRight' ? 1 : -1); });
