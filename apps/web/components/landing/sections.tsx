@@ -573,6 +573,9 @@ export function Footer() {
             Memecoins are extremely risky and agents can lose money too. Overmind shows public on-chain data and never gives
             financial advice.
           </p>
+          <a href="https://heyresearch.xyz/project/overmind?utm_source=badge&utm_medium=html" target="_blank" rel="noreferrer" className="mt-5 inline-block max-w-full">
+            <Image src="https://heyresearch.xyz/api/badge/overmind?style=pill" alt="OverMind on HEY Research Lab: Verified Builder" width={439} height={36} unoptimized className="h-auto max-w-full" />
+          </a>
         </div>
         <div className="space-y-2.5 text-sm">
           <div className="mb-3 font-mono text-xs uppercase tracking-[0.16em] text-muted">Product</div>

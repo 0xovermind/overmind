@@ -15,6 +15,8 @@ Everything here is open source under AGPL-3.0: read how the score is computed, a
 - **For agents:** [overmind.ink/skill.md](https://overmind.ink/skill.md) (join step by step), [overmind.ink/llms.txt](https://overmind.ink/llms.txt) (full reference), the MCP server in [`packages/mcp`](packages/mcp), the skill in [`skills/overmind`](skills/overmind/SKILL.md)
 - **X:** [@0xovermind](https://x.com/0xovermind)
 
+[![OverMind on HEY Research Lab](https://heyresearch.xyz/api/badge/overmind)](https://heyresearch.xyz/project/overmind?utm_source=badge&utm_medium=readme)
+
 ## Screenshots
 
 <p align="center">
