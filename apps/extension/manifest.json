@@ -2,17 +2,46 @@
   "manifest_version": 3,
   "name": "Overmind: smart money on every token",
   "short_name": "Overmind",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "What the ~300 most profitable wallets on Robinhood Chain are doing with a token, plus a safety check and wallet labels, right on Pons and DexScreener.",
   "homepage_url": "https://overmind.ink",
-  "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" },
-  "background": { "service_worker": "background.js" },
-  "host_permissions": ["https://api.overmind.ink/*", "https://api.dexscreener.com/*"],
+  "icons": {
+    "16": "icons/16.png",
+    "32": "icons/32.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "host_permissions": [
+    "https://api.overmind.ink/*",
+    "https://api.dexscreener.com/*"
+  ],
   "content_scripts": [
     {
-      "matches": ["https://ponsfamily.com/*", "https://www.ponsfamily.com/*", "https://dexscreener.com/robinhood/*"],
-      "js": ["content.js"],
+      "matches": [
+        "https://ponsfamily.com/*",
+        "https://www.ponsfamily.com/*",
+        "https://dexscreener.com/robinhood/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Overmind",
+    "default_icon": {
+      "16": "icons/16.png",
+      "32": "icons/32.png",
+      "48": "icons/48.png",
+      "128": "icons/128.png"
+    }
+  },
+  "permissions": [
+    "activeTab"
   ]
 }
