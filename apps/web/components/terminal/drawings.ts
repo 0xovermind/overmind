@@ -262,7 +262,10 @@ export class Drawings implements ISeriesPrimitive<Time> {
             c.stroke();
             c.fillStyle = FIB_COLORS[i]!;
             c.textAlign = 'left';
-            c.fillText(`${FIB[i]}  ${this.ctx.format(lv[i]! * scaleK)}`, right + 6 * hr, y);
+            const txt = `${FIB[i]}  ${this.ctx.format(lv[i]! * scaleK)}`;
+            // labels go right of the levels; when the levels reach the price axis they go inside, on a backing
+            if (right + 6 * hr + c.measureText(txt).width < W - 4 * hr) c.fillText(txt, right + 6 * hr, y);
+            else label(txt, right - 4 * hr, y, FIB_COLORS[i]!, 'right');
           }
           c.strokeStyle = 'rgba(255,255,255,.25)';
           c.setLineDash([4 * hr, 4 * hr]);
