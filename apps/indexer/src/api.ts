@@ -15,7 +15,7 @@ import { refreshSignalsIfStale } from './signals-refresh';
 import { page, repairBalances, walletHoldings, walletPosition } from './wallets';
 import { PAUSED_BODY, readPause } from './pause';
 import { TRANSPARENCY_CACHE_S, transparency } from './transparency';
-import { asScope, hiveBoard, hiveDaily, hiveHistory, hiveToken, smartTraders } from './hive';
+import { asScope, hiveBoard, hiveDaily, hiveHistory, hiveToken, smartTrades, smartTraders } from './hive';
 import { hiveSignals, pendingSignals, PUBLIC_DELAY } from './signals-hive';
 import { BurnsNotReady, ovhiveBurns } from './burns';
 import { devWallet } from './dev-wallet';
@@ -359,6 +359,9 @@ api.get('/hive/signals', async (c) =>
 /** A token's hive reading over the last day (smart-wallet flow, rebuilt from swaps). Longer ranges are Hive Pro: /v1/hive/:address/history. */
 api.get('/hive/:address/history', async (c) =>
   c.json({ points: await hiveHistory(c.var.sql, addr(c.req.param('address')), 1) }, 200, cache(60)));
+/** The smart set's buys and sells on a token (time, side, size; no wallets), for marks on the chart. */
+api.get('/hive/:address/trades', async (c) =>
+  c.json({ trades: await smartTrades(c.var.sql, addr(c.req.param('address')), Number(c.req.query('days') ?? 7) || 7) }, 200, cache(30)));
 api.get('/hive/:address', async (c) => c.json({ consensus: await hiveToken(c.var.sql, addr(c.req.param('address'))) }, 200, cache(20)));
 /** The top traders: the smart set with each wallet's best token and current holdings (see hive.ts). */
 api.get('/traders', async (c) => c.json(await smartTraders(c.var.sql, Math.min(Number(c.req.query('limit') ?? 100) || 100, 300)), 200, cache(60)));

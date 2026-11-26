@@ -24,6 +24,7 @@ import { iconSrc } from './bits';
 import { avatarSeed, MemberAvatar } from './member-avatar';
 import { CALL_RADIUS, CallMarks, TradePills, type CallMark, type Pill } from './trade-pills';
 import { ChartTools, STRIP_W } from './chart-tools';
+import { SmartMarks, type SmartMark } from './smart-marks';
 import { Drawings, INDICATORS, bollinger, ema, loadDrawings, rsi, saveDrawings, sma, vwap, type Drawing, type IndicatorId, type Tool } from './drawings';
 
 /** At most this many calls are drawn (the most recent), so the chart stays readable. */
@@ -110,6 +111,10 @@ export function PriceChart({
   const [hovering, setHovering] = useState(false);
   const [showCalls, setShowCalls] = useState(true);
   const [showTrades, setShowTrades] = useState(true);
+  // Smart money: the trades of the wallets behind the hive score, marked on the candles.
+  const [showSmart, setShowSmart] = useState(true);
+  const [smartTrades, setSmartTrades] = useState<{ time: number; side: 'buy' | 'sell'; usd: number }[]>([]);
+  const smartMarks = useRef<SmartMarks | null>(null);
   // The call pill under the cursor, with its centre in the chart pane (CSS pixels).
   const [hoverCall, setHoverCall] = useState<{ call: Callout; x: number; y: number; others: number } | null>(null);
   const callsById = useRef(new Map<string, Callout>());
@@ -138,24 +143,25 @@ export function PriceChart({
   // Remember the last interval and mode.
   useEffect(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem('overmind.chart') ?? '{}') as { iv?: Interval; mode?: 'mcap' | 'price'; calls?: boolean; trades?: boolean; inds?: IndicatorId[]; magnet?: boolean };
+      const saved = JSON.parse(localStorage.getItem('overmind.chart') ?? '{}') as { iv?: Interval; mode?: 'mcap' | 'price'; calls?: boolean; trades?: boolean; smart?: boolean; inds?: IndicatorId[]; magnet?: boolean };
       if (Array.isArray(saved.inds)) setInds(saved.inds.filter((x) => INDICATORS.some((i) => i.id === x)));
       if (saved.magnet === false) setMagnet(false);
       if (saved.iv && saved.iv in INTERVALS) setIv(saved.iv);
       if (saved.mode === 'price' || saved.mode === 'mcap') setMode(saved.mode);
       if (saved.calls === false) setShowCalls(false);
       if (saved.trades === false) setShowTrades(false);
+      if (saved.smart === false) setShowSmart(false);
     } catch {
       // storage unavailable
     }
   }, []);
   useEffect(() => {
     try {
-      localStorage.setItem('overmind.chart', JSON.stringify({ iv: interval, mode, calls: showCalls, trades: showTrades, inds, magnet }));
+      localStorage.setItem('overmind.chart', JSON.stringify({ iv: interval, mode, calls: showCalls, trades: showTrades, smart: showSmart, inds, magnet }));
     } catch {
       // storage unavailable
     }
-  }, [interval, mode, showCalls, showTrades, inds, magnet]);
+  }, [interval, mode, showCalls, showTrades, showSmart, inds, magnet]);
 
   useEffect(() => {
     if (!box.current) return;
@@ -185,6 +191,8 @@ export function PriceChart({
     candles.current.attachPrimitive(pills.current);
     callMarks.current = new CallMarks();
     candles.current.attachPrimitive(callMarks.current);
+    smartMarks.current = new SmartMarks((time) => bars.current.get(time));
+    candles.current.attachPrimitive(smartMarks.current);
     drawings.current = new Drawings({ times: () => times.current, step: () => stepRef.current, scale: () => scaleRef.current, format: (v) => usdPrecise(v) });
     candles.current.attachPrimitive(drawings.current);
     c.priceScale('vol').applyOptions({ scaleMargins: { top: 0.82, bottom: 0 }, visible: false });
@@ -213,6 +221,7 @@ export function PriceChart({
       c.unsubscribeClick(onClick);
       pills.current = null;
       callMarks.current = null;
+      smartMarks.current = null;
       drawings.current = null;
       indSeries.current.clear();
       c.remove();
@@ -466,7 +475,41 @@ export function PriceChart({
     if (panes.length > 1) panes[1]!.setHeight(Math.max(56, Math.min(110, Math.round((box.current?.clientHeight ?? 300) * 0.24))));
   }, [inds, base, scale, lastBar]);
 
+  // Smart money: refreshed every minute; grouped per candle of this interval.
+  useEffect(() => {
+    let live = true;
+    const load = () =>
+      fetch(`${API_URL}/hive/${address}/trades?days=7`)
+        .then((r) => (r.ok ? (r.json() as Promise<{ trades?: { time: number; side: 'buy' | 'sell'; usd: number }[] }>) : null))
+        .then((j) => {
+          if (live && j?.trades) setSmartTrades(j.trades);
+        })
+        .catch(() => {});
+    setSmartTrades([]);
+    void load();
+    const t = setInterval(load, 60_000);
+    return () => {
+      live = false;
+      clearInterval(t);
+    };
+  }, [address]);
+  const smartByBar = useMemo(() => {
+    const m = new Map<number, SmartMark>();
+    const step = INTERVALS[interval];
+    for (const x of smartTrades) {
+      const bucket = Math.floor(x.time / step) * step;
+      const g = m.get(bucket) ?? { time: bucket, buys: 0, sells: 0, buyUsd: 0, sellUsd: 0 };
+      if (x.side === 'buy') { g.buys++; g.buyUsd += x.usd; } else { g.sells++; g.sellUsd += x.usd; }
+      m.set(bucket, g);
+    }
+    return m;
+  }, [smartTrades, interval]);
+  useEffect(() => {
+    smartMarks.current?.set(showSmart ? [...smartByBar.values()].filter((g) => bars.current.has(g.time)) : []);
+  }, [smartByBar, showSmart, base, scale, lastBar]);
+
   const ownHere = legend ? ownByBar.get(legend.time) : undefined;
+  const smartHere = legend && showSmart ? smartByBar.get(legend.time) : undefined;
   const empty = base != null && base.length === 0 && !(trades?.length && FROM_TRADES.has(interval));
   const hydrating = isHydrating(hydration);
   const loading = base == null;
@@ -492,6 +535,7 @@ export function PriceChart({
           {calls != null && (
             <ChipToggle on={showCalls} onClick={() => setShowCalls(!showCalls)} label="Calls" />
           )}
+          <ChipToggle on={showSmart} onClick={() => setShowSmart(!showSmart)} label={smartTrades.length ? `◆ Smart money ${smartTrades.length}` : '◆ Smart money'} short="◆ Smart" />
           {marks != null && <ChipToggle on={showTrades} onClick={() => setShowTrades(!showTrades)} label="My trades" short="Mine" />}
         </div>
         <div className="ml-1 flex shrink-0 rounded-lg bg-ink/[0.04] p-0.5">
@@ -547,6 +591,14 @@ export function PriceChart({
               Vol <span className="text-ink/80">{usd(legend.volume)}</span>
             </span>
             {ownHere && <OwnLegend g={ownHere} scale={scale} />}
+            {smartHere && (
+              <span className="text-ink/80">
+                <span style={{ color: '#facb0e' }}>◆</span> Smart money:{' '}
+                {smartHere.buys > 0 && <span className="text-brand">{smartHere.buys} bought {usd(smartHere.buyUsd)}</span>}
+                {smartHere.buys > 0 && smartHere.sells > 0 && ' · '}
+                {smartHere.sells > 0 && <span className="text-risk-high">{smartHere.sells} sold {usd(smartHere.sellUsd)}</span>}
+              </span>
+            )}
           </div>
         )}
         {hoverCall && <CallHover hover={hoverCall} scale={scale} />}

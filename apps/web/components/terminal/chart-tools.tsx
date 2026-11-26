@@ -60,7 +60,7 @@ function Strip(p: {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement;
-      if (el.closest('input,textarea,[contenteditable="true"]') || e.metaKey || e.ctrlKey || e.altKey) return;
+      if ((el as Element | null)?.closest?.('input,textarea,[contenteditable="true"]') || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === 'Escape') return p.onTool('cursor');
       const t = TOOLS.find((x) => x.key.toLowerCase() === e.key.toLowerCase());
       if (t) p.onTool(t.id);
@@ -289,7 +289,7 @@ function Editor(p: {
     };
     const key = (e: KeyboardEvent) => {
       const s = st.current;
-      if (!s.selected || (e.target as HTMLElement).closest('input,textarea,[contenteditable="true"]')) return;
+      if (!s.selected || (e.target as Element | null)?.closest?.('input,textarea,[contenteditable="true"]')) return;
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
         s.onChange(s.items.filter((i) => i.id !== s.selected));
