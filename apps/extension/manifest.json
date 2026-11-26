@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "Overmind: smart money on every token",
   "short_name": "Overmind",
-  "version": "0.6.0",
-  "description": "What the ~300 most profitable wallets on Robinhood Chain are doing with a token, plus a safety check and wallet labels, right on Pons and DexScreener.",
+  "version": "0.6.1",
+  "description": "Smart money and a safety check for every Robinhood Chain token, right on Pons and DexScreener.",
   "homepage_url": "https://overmind.ink",
   "icons": {
     "16": "icons/16.png",
