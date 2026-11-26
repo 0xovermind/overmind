@@ -22,20 +22,21 @@
 <main>
   <a class="brand" href="/"><svg width="26" height="26" viewBox="0 0 100 100"><circle cx="50" cy="50" r="49" fill="#e6e5e0"/><circle cx="50" cy="50" r="33" fill="none" stroke="#1c1c1e" stroke-width="7"/><circle cx="50" cy="50" r="17" fill="none" stroke="#1c1c1e" stroke-width="7"/><circle cx="50" cy="50" r="6" fill="#1c1c1e"/></svg>overmind</a>
   <h1>Overmind extension: privacy</h1>
-  <p class="muted">Last updated: November 25, 2026</p>
+  <p class="muted">Last updated: November 26, 2026</p>
 
   <p>The Overmind browser extension shows the Overmind hive score of a token on its Pons and DexScreener page. This page explains, in full, what it does with data.</p>
 
   <h2>What it reads</h2>
   <ul>
-    <li>Only the address in the URL of the tab you are viewing, and only on <code>ponsfamily.com</code> and <code>dexscreener.com/robinhood</code>.</li>
-    <li>It does not read the page's content, your wallet, your cookies, your browsing history or anything you type.</li>
+    <li>On <code>ponsfamily.com</code> and <code>dexscreener.com/robinhood</code> only: the token (or pair) address in the URL of the tab you are viewing, and the wallet addresses in the page's own wallet links (its trade and holder lists), so it can label them.</li>
+    <li>When you click the Overmind toolbar icon: the URL of the current tab, to show the token open in it.</li>
+    <li>It does not read your wallet, your cookies, your browsing history or anything you type.</li>
   </ul>
 
   <h2>What it sends, and where</h2>
   <ul>
-    <li>The token (or DexScreener pair) address, to <code>api.overmind.ink</code> to get its hive score, and to <code>api.dexscreener.com</code> to find which token a pair belongs to.</li>
-    <li>Nothing else. No identifiers, no analytics, no tracking, no ads.</li>
+    <li>Token and wallet addresses that are already public on the page, to <code>api.overmind.ink</code> for the hive score, safety check, wallet labels, Wallet DNA and the Overmind AI read; and a pair address to <code>api.dexscreener.com</code> to find which token it belongs to.</li>
+    <li>Nothing about you. No identifiers, no analytics, no tracking, no ads.</li>
   </ul>
 
   <h2>What it stores</h2>
