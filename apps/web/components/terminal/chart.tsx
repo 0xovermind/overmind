@@ -24,7 +24,7 @@ import { iconSrc } from './bits';
 import { avatarSeed, MemberAvatar } from './member-avatar';
 import { CALL_RADIUS, CallMarks, TradePills, type CallMark, type Pill } from './trade-pills';
 import { ChartTools, STRIP_W } from './chart-tools';
-import { SmartMarks, type SmartMark } from './smart-marks';
+import { RadarMarks, SmartMarks, type RadarMark, type SmartMark } from './smart-marks';
 import { Drawings, INDICATORS, bollinger, ema, loadDrawings, rsi, saveDrawings, sma, vwap, type Drawing, type IndicatorId, type Tool } from './drawings';
 
 /** At most this many calls are drawn (the most recent), so the chart stays readable. */
@@ -115,6 +115,10 @@ export function PriceChart({
   const [showSmart, setShowSmart] = useState(true);
   const [smartTrades, setSmartTrades] = useState<{ time: number; side: 'buy' | 'sell'; usd: number }[]>([]);
   const smartMarks = useRef<SmartMarks | null>(null);
+  // Telegram calls and DexScreener promotions (RH Radar), marked at the top of the pane.
+  const [showTg, setShowTg] = useState(true);
+  const [radar, setRadar] = useState<{ calls: { time: number; group: string; mcap: number | null }[]; promos: { time: number; type: string }[] }>({ calls: [], promos: [] });
+  const radarMarks = useRef<RadarMarks | null>(null);
   // The call pill under the cursor, with its centre in the chart pane (CSS pixels).
   const [hoverCall, setHoverCall] = useState<{ call: Callout; x: number; y: number; others: number } | null>(null);
   const callsById = useRef(new Map<string, Callout>());
@@ -143,7 +147,7 @@ export function PriceChart({
   // Remember the last interval and mode.
   useEffect(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem('overmind.chart') ?? '{}') as { iv?: Interval; mode?: 'mcap' | 'price'; calls?: boolean; trades?: boolean; smart?: boolean; inds?: IndicatorId[]; magnet?: boolean };
+      const saved = JSON.parse(localStorage.getItem('overmind.chart') ?? '{}') as { iv?: Interval; mode?: 'mcap' | 'price'; calls?: boolean; trades?: boolean; smart?: boolean; tg?: boolean; inds?: IndicatorId[]; magnet?: boolean };
       if (Array.isArray(saved.inds)) setInds(saved.inds.filter((x) => INDICATORS.some((i) => i.id === x)));
       if (saved.magnet === false) setMagnet(false);
       if (saved.iv && saved.iv in INTERVALS) setIv(saved.iv);
@@ -151,17 +155,18 @@ export function PriceChart({
       if (saved.calls === false) setShowCalls(false);
       if (saved.trades === false) setShowTrades(false);
       if (saved.smart === false) setShowSmart(false);
+      if (saved.tg === false) setShowTg(false);
     } catch {
       // storage unavailable
     }
   }, []);
   useEffect(() => {
     try {
-      localStorage.setItem('overmind.chart', JSON.stringify({ iv: interval, mode, calls: showCalls, trades: showTrades, smart: showSmart, inds, magnet }));
+      localStorage.setItem('overmind.chart', JSON.stringify({ iv: interval, mode, calls: showCalls, trades: showTrades, smart: showSmart, tg: showTg, inds, magnet }));
     } catch {
       // storage unavailable
     }
-  }, [interval, mode, showCalls, showTrades, showSmart, inds, magnet]);
+  }, [interval, mode, showCalls, showTrades, showSmart, showTg, inds, magnet]);
 
   useEffect(() => {
     if (!box.current) return;
@@ -192,6 +197,8 @@ export function PriceChart({
     callMarks.current = new CallMarks();
     candles.current.attachPrimitive(callMarks.current);
     smartMarks.current = new SmartMarks((time) => bars.current.get(time));
+    radarMarks.current = new RadarMarks();
+    candles.current.attachPrimitive(radarMarks.current);
     candles.current.attachPrimitive(smartMarks.current);
     drawings.current = new Drawings({ times: () => times.current, step: () => stepRef.current, scale: () => scaleRef.current, format: (v) => usdPrecise(v) });
     candles.current.attachPrimitive(drawings.current);
@@ -222,6 +229,7 @@ export function PriceChart({
       pills.current = null;
       callMarks.current = null;
       smartMarks.current = null;
+      radarMarks.current = null;
       drawings.current = null;
       indSeries.current.clear();
       c.remove();
@@ -493,6 +501,46 @@ export function PriceChart({
       clearInterval(t);
     };
   }, [address]);
+  // RH Radar: refreshed every 3 minutes (the indexer caches it and keeps within their rate limit).
+  useEffect(() => {
+    let live = true;
+    const load = () =>
+      fetch(`${API_URL}/radar/${address}`)
+        .then((res) => (res.ok ? (res.json() as Promise<{ calls?: { time: number; group: string; mcap: number | null }[]; promos?: { time: number; type: string }[] }>) : null))
+        .then((j) => {
+          if (live && j) setRadar({ calls: j.calls ?? [], promos: j.promos ?? [] });
+        })
+        .catch(() => {});
+    setRadar({ calls: [], promos: [] });
+    void load();
+    const t = setInterval(load, 180_000);
+    return () => {
+      live = false;
+      clearInterval(t);
+    };
+  }, [address]);
+  const radarByBar = useMemo(() => {
+    const m = new Map<number, RadarMark & { groupSet: Set<string>; mcaps: number[] }>();
+    const step = INTERVALS[interval];
+    const at = (time: number) => {
+      const bucket = Math.floor(time / step) * step;
+      let g = m.get(bucket);
+      if (!g) m.set(bucket, (g = { time: bucket, calls: 0, groups: 0, promos: [], groupSet: new Set(), mcaps: [] }));
+      return g;
+    };
+    for (const c of radar.calls) {
+      const g = at(c.time);
+      g.calls++;
+      g.groupSet.add(c.group);
+      g.groups = g.groupSet.size;
+      if (c.mcap != null) g.mcaps.push(c.mcap);
+    }
+    for (const p of radar.promos) at(p.time).promos.push(p.type);
+    return m;
+  }, [radar, interval]);
+  useEffect(() => {
+    radarMarks.current?.set(showTg ? [...radarByBar.values()].filter((g) => bars.current.has(g.time)) : []);
+  }, [radarByBar, showTg, base, scale, lastBar]);
   const smartByBar = useMemo(() => {
     const m = new Map<number, SmartMark>();
     const step = INTERVALS[interval];
@@ -510,6 +558,8 @@ export function PriceChart({
 
   const ownHere = legend ? ownByBar.get(legend.time) : undefined;
   const smartHere = legend && showSmart ? smartByBar.get(legend.time) : undefined;
+  const radarHere = legend && showTg ? radarByBar.get(legend.time) : undefined;
+  const radarCount = radar.calls.length + radar.promos.length;
   const empty = base != null && base.length === 0 && !(trades?.length && FROM_TRADES.has(interval));
   const hydrating = isHydrating(hydration);
   const loading = base == null;
@@ -535,6 +585,7 @@ export function PriceChart({
           {calls != null && (
             <ChipToggle on={showCalls} onClick={() => setShowCalls(!showCalls)} label="Calls" />
           )}
+          <ChipToggle on={showTg} onClick={() => setShowTg(!showTg)} label={radarCount ? `TG calls ${radar.calls.length}` : 'TG calls'} short="TG" />
           <ChipToggle on={showSmart} onClick={() => setShowSmart(!showSmart)} label={smartTrades.length ? `◆ Smart money ${smartTrades.length}` : '◆ Smart money'} short="◆ Smart" />
           {marks != null && <ChipToggle on={showTrades} onClick={() => setShowTrades(!showTrades)} label="My trades" short="Mine" />}
         </div>
@@ -591,6 +642,20 @@ export function PriceChart({
               Vol <span className="text-ink/80">{usd(legend.volume)}</span>
             </span>
             {ownHere && <OwnLegend g={ownHere} scale={scale} />}
+            {radarHere && (
+              <span className="text-ink/80">
+                {radarHere.calls > 0 && (
+                  <span style={{ color: '#2aabee' }}>
+                    TG: {radarHere.calls} call{radarHere.calls > 1 ? 's' : ''}
+                    {radarHere.groups > 1 ? ` from ${radarHere.groups} groups` : ''}
+                    {radarHere.mcaps.length ? ` at ${usd(radarHere.mcaps[0]!)}` : ''}
+                  </span>
+                )}
+                {radarHere.calls > 0 && radarHere.promos.length > 0 && ' · '}
+                {radarHere.promos.length > 0 && <span style={{ color: '#b58cff' }}>{radarHere.promos.map((p) => (p === 'tokenProfile' ? 'DEX PAID' : p)).join(', ')}</span>}
+                <span className="text-muted"> · via RH Radar</span>
+              </span>
+            )}
             {smartHere && (
               <span className="text-ink/80">
                 <span style={{ color: '#facb0e' }}>◆</span> Smart money:{' '}

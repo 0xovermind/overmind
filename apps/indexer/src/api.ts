@@ -15,6 +15,7 @@ import { refreshSignalsIfStale } from './signals-refresh';
 import { page, repairBalances, walletHoldings, walletPosition } from './wallets';
 import { PAUSED_BODY, readPause } from './pause';
 import { TRANSPARENCY_CACHE_S, transparency } from './transparency';
+import { radarRead } from './radar';
 import { asScope, hiveBoard, hiveDaily, hiveHistory, hiveToken, smartTrades, smartTraders } from './hive';
 import { hiveSignals, pendingSignals, PUBLIC_DELAY } from './signals-hive';
 import { BurnsNotReady, ovhiveBurns } from './burns';
@@ -362,6 +363,8 @@ api.get('/hive/:address/history', async (c) =>
 /** The smart set's buys and sells on a token (time, side, size; no wallets), for marks on the chart. */
 api.get('/hive/:address/trades', async (c) =>
   c.json({ trades: await smartTrades(c.var.sql, addr(c.req.param('address')), Number(c.req.query('days') ?? 7) || 7) }, 200, cache(30)));
+/** Telegram calls and DexScreener promotions on a token, from RH Radar (cached; see radar.ts). */
+api.get('/radar/:address', async (c) => c.json(await radarRead(c.env, addr(c.req.param('address'))), 200, cache(60)));
 api.get('/hive/:address', async (c) => c.json({ consensus: await hiveToken(c.var.sql, addr(c.req.param('address'))) }, 200, cache(20)));
 /** The top traders: the smart set with each wallet's best token and current holdings (see hive.ts). */
 api.get('/traders', async (c) => c.json(await smartTraders(c.var.sql, Math.min(Number(c.req.query('limit') ?? 100) || 100, 300)), 200, cache(60)));

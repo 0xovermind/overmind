@@ -12,6 +12,8 @@ export interface Env {
   PUBLIC_RPC_URL?: string;
   /** Bearer token for /admin/* in production (wrangler secret). */
   ADMIN_TOKEN?: string;
+  /** RH Radar API key (Telegram calls and DexScreener promotions per token), see radar.ts. */
+  RHR_API_KEY?: string;
   DATABASE_URL?: string;
   /** First run only: how many blocks before head to start from (default 33000 ≈ 1h). */
   START_BLOCKS_BACK?: string;

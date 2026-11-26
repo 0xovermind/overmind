@@ -120,3 +120,92 @@ export class SmartMarks implements ISeriesPrimitive<Time> {
     });
   }
 }
+
+/** Telegram calls and DexScreener promotions on one candle (RH Radar, via the indexer's /radar/:address). */
+export interface RadarMark {
+  time: number;
+  calls: number;
+  groups: number;
+  promos: string[];
+}
+
+const TG = '#2aabee';
+const PROMO = '#b58cff';
+
+/**
+ * Social events on the chart: a badge near the top of the pane at each candle with Telegram calls ("TG",
+ * with the count) or a DexScreener promotion ("$"), and a faint dotted line down through the candles,
+ * so what smart money did before and after the call is plain to see.
+ */
+export class RadarMarks implements ISeriesPrimitive<Time> {
+  private chart: IChartApi | null = null;
+  private series: ISeriesApi<SeriesType> | null = null;
+  private request: (() => void) | null = null;
+  private items: RadarMark[] = [];
+  private readonly view: IPrimitivePaneView;
+
+  constructor() {
+    const renderer: IPrimitivePaneRenderer = { draw: (target) => this.draw(target) };
+    this.view = { zOrder: () => 'top', renderer: () => renderer };
+  }
+  attached(p: SeriesAttachedParameter<Time>) {
+    this.chart = p.chart;
+    this.series = p.series;
+    this.request = p.requestUpdate;
+  }
+  detached() {
+    this.chart = null;
+    this.series = null;
+    this.request = null;
+  }
+  set(items: RadarMark[]) {
+    this.items = items;
+    this.request?.();
+  }
+  updateAllViews() {}
+  paneViews() {
+    return [this.view];
+  }
+
+  private draw(target: Target) {
+    const chart = this.chart;
+    if (!chart || !this.series || !this.items.length) return;
+    target.useBitmapCoordinateSpace(({ context: c, horizontalPixelRatio: hr, verticalPixelRatio: vr, bitmapSize }) => {
+      const h = 16 * vr;
+      const top = 26 * vr; // under the OHLC legend
+      c.font = `800 ${Math.round(9.5 * vr)}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      for (const it of this.items) {
+        const x0 = chart.timeScale().timeToCoordinate(it.time as Time);
+        if (x0 == null) continue;
+        const x = x0 * hr;
+        const parts: { label: string; color: string }[] = [];
+        if (it.calls) parts.push({ label: it.calls > 1 ? `TG ${it.calls}` : 'TG', color: TG });
+        if (it.promos.length) parts.push({ label: '$', color: PROMO });
+        let y = top;
+        for (const p of parts) {
+          const w = c.measureText(p.label).width + 12 * hr;
+          // faint guide down through the candles
+          c.strokeStyle = p.color;
+          c.globalAlpha = 0.28;
+          c.lineWidth = 1 * hr;
+          c.setLineDash([2 * hr, 4 * hr]);
+          c.beginPath();
+          c.moveTo(x, y + h);
+          c.lineTo(x, bitmapSize.height);
+          c.stroke();
+          c.setLineDash([]);
+          c.globalAlpha = 1;
+          c.fillStyle = p.color;
+          c.beginPath();
+          c.roundRect(x - w / 2, y, w, h, 4 * hr);
+          c.fill();
+          c.fillStyle = '#0b0b0f';
+          c.fillText(p.label, x, y + h / 2 + 0.5 * vr);
+          y += h + 3 * vr;
+        }
+      }
+    });
+  }
+}
