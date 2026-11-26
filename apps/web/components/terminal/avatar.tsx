@@ -67,7 +67,7 @@ export function GeneratedAvatar({
         </linearGradient>
       </defs>
       <rect width="40" height="40" fill={`url(#${id})`} />
-      <g fill="#fff" opacity="0.11">
+      <g fill="#fff" opacity="0.2">
         {cells.map(([c, r]) => (
           <rect
             key={`${c}-${r}`}
@@ -80,8 +80,9 @@ export function GeneratedAvatar({
         ))}
       </g>
       {/* Soft top-left sheen so it reads as a coin, not a flat sticker. */}
-      <circle cx="13" cy="10" r="16" fill="#fff" opacity="0.07" />
-      
+      <circle cx="13" cy="10" r="16" fill="#fff" opacity="0.09" />
+      {/* a thin inner ring, so it reads as a coin even at 20px */}
+      <circle cx="20" cy="20" r="18.6" fill="none" stroke="#fff" strokeOpacity="0.16" strokeWidth="1.2" />
       <text
         x="20"
         y="20"

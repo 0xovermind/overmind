@@ -46,6 +46,8 @@ export interface HiveRow {
   name: string;
   image_url: string | null;
   status: string;
+  /** Where the token launched (pons, doppler, liftfun, uniswap-v4 for a plain pool); lets clients hide plain pools. */
+  launchpad: string | null;
   market_cap_usd: number | null;
   price_usd: number | null;
   smart_buyers: number;
@@ -198,7 +200,7 @@ const rowsFor = async (sql: Sql, token: string | null, minVoters: number, limit:
   select j.*, (smart_buyers + smart_sellers + bullish_calls + bearish_calls)::int as voters,
     round(100.0 * ((smart_buyers + bullish_calls) - (smart_sellers + bearish_calls))
       / nullif(smart_buyers + smart_sellers + bullish_calls + bearish_calls, 0))::int as score,
-    t.symbol, t.name, t.image_url, t.status, t.created_at,
+    t.symbol, t.name, t.image_url, t.status, t.launchpad, t.created_at,
     t.market_cap_usd::float8 as market_cap_usd, t.price_usd::float8 as price_usd
   from j
   join tokens t on t.address = j.token

@@ -47,9 +47,14 @@ function PulseCard({ r, i }: { r: HiveRow; i: number }) {
   );
 }
 
-/** A strip across the top of the trenches: what the hive is doing right now. */
-export function HivePulse() {
-  const { rows } = useHive();
+/**
+ * A strip across the top of the trenches: what the hive is doing right now. It follows the Markets
+ * "Plain pools" toggle: tokens launched as a bare Uniswap pool (no launchpad, usually no logo or
+ * socials anywhere) stay out unless the user asks for them. Spam and copycats never reach the board.
+ */
+export function HivePulse({ showPlain = false }: { showPlain?: boolean }) {
+  const { rows: all } = useHive();
+  const rows = showPlain ? all : all.filter((r) => (r.launchpad ?? 'uniswap-v4') !== 'uniswap-v4');
   return (
     <section className="flex items-stretch gap-3 px-2 pb-2">
       <div className="flex w-[150px] shrink-0 flex-col justify-center rounded-xl bg-ink px-3 py-2.5 text-bg">

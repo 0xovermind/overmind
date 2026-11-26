@@ -8,6 +8,8 @@ export interface HiveRow {
   symbol: string;
   name: string;
   image_url: string | null;
+  /** Where the token launched; 'uniswap-v4' (or null) is a plain pool, hidden like on Markets. */
+  launchpad?: string | null;
   market_cap_usd: number | null;
   smart_buyers: number;
   smart_sellers: number;
@@ -24,10 +26,16 @@ let timer: ReturnType<typeof setInterval> | null = null;
 
 async function load() {
   try {
-    const res = await fetch(`${API_URL}/hive?limit=60`);
-    if (!res.ok) return;
-    const body = (await res.json()) as { tokens: HiveRow[] };
-    cache = { rows: body.tokens, byToken: new Map(body.tokens.map((r) => [r.token.toLowerCase(), r])) };
+    // The chain-wide board, plus the Pons board (its own smart set): most chain-wide rows are plain pools
+    // without a logo, and Pons launches are where most of the hive's readings live.
+    const board = (u: string): Promise<{ tokens: HiveRow[] }> =>
+      fetch(u).then((r) => (r.ok ? (r.json() as Promise<{ tokens: HiveRow[] }>) : { tokens: [] })).catch(() => ({ tokens: [] }));
+    const [all, pons] = await Promise.all([board(`${API_URL}/hive?limit=60`), board(`${API_URL}/hive?limit=60&scope=pons`)]);
+    if (!all.tokens.length && !pons.tokens.length) return;
+    const byToken = new Map<string, HiveRow>();
+    for (const r of [...all.tokens, ...pons.tokens]) if (!byToken.has(r.token.toLowerCase())) byToken.set(r.token.toLowerCase(), r);
+    const rows = [...byToken.values()].sort((a, b) => b.voters - a.voters);
+    cache = { rows, byToken };
     subs.forEach((f) => f());
   } catch {
     // keep the last board

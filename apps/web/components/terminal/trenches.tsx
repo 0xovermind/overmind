@@ -254,7 +254,7 @@ export function Trenches({ initial, serverNow }: { initial: TokenCard[]; serverN
   return (
     <div className="flex h-full flex-col">
       <Toolbar showSpam={showSpam} onShowSpam={setShowSpam} showPlain={showPlain} onShowPlain={setShowPlain} quick={quick} onQuick={changeQuick} />
-      <HivePulse />
+      <HivePulse showPlain={showPlain} />
       {/* Mobile: one column at a time */}
       <div className="flex gap-1 px-2 pb-2 md:hidden">
         {COLUMNS.map((c) => (
