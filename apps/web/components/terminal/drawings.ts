@@ -94,6 +94,17 @@ export class Drawings implements ISeriesPrimitive<Time> {
   }
 
   // ---------- coordinates ----------
+  /** x for a fractional bar index: the chart only maps whole indices (a fraction comes back as 0). */
+  private lx(l: number): number | null {
+    const ts = this.chart?.timeScale();
+    if (!ts) return null;
+    const i = Math.floor(l);
+    const a = ts.logicalToCoordinate(i as never);
+    if (a == null) return null;
+    if (l === i) return a;
+    const b = ts.logicalToCoordinate((i + 1) as never);
+    return b == null ? a : a + (l - i) * (b - a);
+  }
   /** x (CSS px) for a unix time, on the candle grid (interpolated between and beyond candles). */
   x(t: number): number | null {
     const ts = this.chart?.timeScale();
@@ -102,15 +113,15 @@ export class Drawings implements ISeriesPrimitive<Time> {
     const step = this.ctx.step();
     let lo = 0;
     let hi = times.length - 1;
-    if (t <= times[0]!) return ts.logicalToCoordinate(((t - times[0]!) / step) as never);
-    if (t >= times[hi]!) return ts.logicalToCoordinate((hi + (t - times[hi]!) / step) as never);
+    if (t <= times[0]!) return this.lx((t - times[0]!) / step);
+    if (t >= times[hi]!) return this.lx(hi + (t - times[hi]!) / step);
     while (hi - lo > 1) {
       const mid = (lo + hi) >> 1;
       if (times[mid]! <= t) lo = mid;
       else hi = mid;
     }
     const frac = (t - times[lo]!) / Math.max(1, times[hi]! - times[lo]!);
-    return ts.logicalToCoordinate((lo + frac * (hi - lo)) as never);
+    return this.lx(lo + frac * (hi - lo));
   }
   /** y (CSS px) for a USD price, in the chart's current units. */
   y(p: number): number | null {
@@ -122,14 +133,19 @@ export class Drawings implements ISeriesPrimitive<Time> {
     const times = this.ctx.times();
     const s = this.series;
     if (!ts || !s || !times.length) return null;
-    const logical = ts.coordinateToLogical(x);
+    const whole = ts.coordinateToLogical(x);
     const v = s.coordinateToPrice(y);
-    if (logical == null || v == null) return null;
+    if (whole == null || v == null) return null;
+    // the chart rounds to a whole bar; add back where between bars the point sits
+    const c0 = this.lx(whole), c1 = this.lx(whole + 1);
+    const logical = c0 != null && c1 != null && c1 !== c0 ? whole + (x - c0) / (c1 - c0) : whole;
     const step = this.ctx.step();
     const i = Math.floor(logical);
     const frac = logical - i;
     const base = i < 0 ? times[0]! + i * step : i >= times.length ? times[times.length - 1]! + (i - times.length + 1) * step : times[i]!;
-    return { t: base + frac * step, p: v / this.ctx.scale() };
+    // between two candles: the same proportion of the real gap that x() uses, so a point lands where it was put
+    const span = i >= 0 && i + 1 < times.length ? times[i + 1]! - times[i]! : step;
+    return { t: base + frac * span, p: v / this.ctx.scale() };
   }
 
   /** The drawing under a pane point (within 7 px), for the eraser. */

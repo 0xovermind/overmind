@@ -138,7 +138,7 @@ function Overlay(p: {
       const vy = api.y(v);
       if (vy != null && Math.abs(vy - y) < dist) { dist = Math.abs(vy - y); best = v; }
     }
-    return best == null ? pt : { t: t + p.step / 2, p: best };
+    return best == null ? pt : { t, p: best };
   };
   const finish = () => {
     const d = draft.current;
