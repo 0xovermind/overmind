@@ -6,6 +6,7 @@ import {
   ColorType,
   createChart,
   HistogramSeries,
+  LineSeries,
   LineStyle,
   type IChartApi,
   type ISeriesApi,
@@ -22,6 +23,8 @@ import type { OwnTrade } from '@/lib/position';
 import { iconSrc } from './bits';
 import { avatarSeed, MemberAvatar } from './member-avatar';
 import { CALL_RADIUS, CallMarks, TradePills, type CallMark, type Pill } from './trade-pills';
+import { ChartTools, STRIP_W } from './chart-tools';
+import { Drawings, INDICATORS, bollinger, ema, loadDrawings, rsi, saveDrawings, sma, vwap, type Drawing, type IndicatorId, type Tool } from './drawings';
 
 /** At most this many calls are drawn (the most recent), so the chart stays readable. */
 const MAX_CALL_MARKS = 30;
@@ -116,11 +119,26 @@ export function PriceChart({
   const onSelectRef = useRef(onSelectCall);
   onSelectRef.current = onSelectCall;
   const scale = mode === 'mcap' && supply > 0 ? supply : 1;
+  // drawings and indicators (TradingView-style analysis tools)
+  const drawings = useRef<Drawings | null>(null);
+  const times = useRef<number[]>([]);
+  const stepRef = useRef(60);
+  stepRef.current = INTERVALS[interval];
+  const scaleRef = useRef(scale);
+  scaleRef.current = scale;
+  const [tool, setTool] = useState<Tool>('cursor');
+  const [items, setItems] = useState<Drawing[]>([]);
+  const [hideDrawings, setHideDrawings] = useState(false);
+  const [magnet, setMagnet] = useState(true);
+  const [inds, setInds] = useState<IndicatorId[]>([]);
+  const indSeries = useRef(new Map<string, ISeriesApi<'Line'>>());
 
   // Remember the last interval and mode.
   useEffect(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem('overmind.chart') ?? '{}') as { iv?: Interval; mode?: 'mcap' | 'price'; calls?: boolean; trades?: boolean };
+      const saved = JSON.parse(localStorage.getItem('overmind.chart') ?? '{}') as { iv?: Interval; mode?: 'mcap' | 'price'; calls?: boolean; trades?: boolean; inds?: IndicatorId[]; magnet?: boolean };
+      if (Array.isArray(saved.inds)) setInds(saved.inds.filter((x) => INDICATORS.some((i) => i.id === x)));
+      if (saved.magnet === false) setMagnet(false);
       if (saved.iv && saved.iv in INTERVALS) setIv(saved.iv);
       if (saved.mode === 'price' || saved.mode === 'mcap') setMode(saved.mode);
       if (saved.calls === false) setShowCalls(false);
@@ -131,11 +149,11 @@ export function PriceChart({
   }, []);
   useEffect(() => {
     try {
-      localStorage.setItem('overmind.chart', JSON.stringify({ iv: interval, mode, calls: showCalls, trades: showTrades }));
+      localStorage.setItem('overmind.chart', JSON.stringify({ iv: interval, mode, calls: showCalls, trades: showTrades, inds, magnet }));
     } catch {
       // storage unavailable
     }
-  }, [interval, mode, showCalls, showTrades]);
+  }, [interval, mode, showCalls, showTrades, inds, magnet]);
 
   useEffect(() => {
     if (!box.current) return;
@@ -165,6 +183,8 @@ export function PriceChart({
     candles.current.attachPrimitive(pills.current);
     callMarks.current = new CallMarks();
     candles.current.attachPrimitive(callMarks.current);
+    drawings.current = new Drawings({ times: () => times.current, step: () => stepRef.current, scale: () => scaleRef.current, format: (v) => usdPrecise(v) });
+    candles.current.attachPrimitive(drawings.current);
     c.priceScale('vol').applyOptions({ scaleMargins: { top: 0.82, bottom: 0 }, visible: false });
     const onMove = (p: MouseEventParams) => {
       const bar = p.time == null ? null : bars.current.get(p.time as number);
@@ -191,6 +211,8 @@ export function PriceChart({
       c.unsubscribeClick(onClick);
       pills.current = null;
       callMarks.current = null;
+      drawings.current = null;
+      indSeries.current.clear();
       c.remove();
     };
   }, []);
@@ -244,6 +266,8 @@ export function PriceChart({
     if (!base) return;
     const series = continuous(base);
     bars.current = new Map(series.map((k) => [k.time, scaled(k, scale)]));
+    times.current = series.map((k) => k.time);
+    drawings.current?.refresh();
     candles.current?.setData(series.map((k) => ({ time: k.time as UTCTimestamp, ...ohlc(k, scale) })));
     volume.current?.setData(series.map((k) => ({ time: k.time as UTCTimestamp, value: k.volume, color: volColor(k) })));
     const tail = series[series.length - 1] ?? null;
@@ -298,6 +322,7 @@ export function PriceChart({
           ? { ...l, high: Math.max(l.high, t.priceUsd), low: Math.min(l.low, t.priceUsd), close: t.priceUsd, volume: l.volume + (t.usd ?? 0) }
           : { time: bucket, open: l?.close ?? t.priceUsd, high: Math.max(t.priceUsd, l?.close ?? 0), low: Math.min(t.priceUsd, l?.close ?? t.priceUsd), close: t.priceUsd, volume: t.usd ?? 0 };
       last.current = bar;
+      if (!bars.current.has(bar.time)) times.current = [...times.current, bar.time];
       bars.current.set(bar.time, scaled(bar, scale));
       candles.current?.update({ time: bar.time as UTCTimestamp, ...ohlc(bar, scale) });
       volume.current?.update({ time: bar.time as UTCTimestamp, value: bar.volume, color: volColor(bar) });
@@ -383,6 +408,61 @@ export function PriceChart({
     api.set(out);
   }, [calls, selectedCall, showCalls, interval, base, scale, lastBar]);
 
+  useEffect(() => {
+    setItems(loadDrawings(address));
+  }, [address]);
+  useEffect(() => {
+    drawings.current?.set(items);
+  }, [items]);
+  useEffect(() => {
+    drawings.current?.setHidden(hideDrawings);
+  }, [hideDrawings]);
+  const commit = (next: Drawing[]) => {
+    setItems(next);
+    saveDrawings(address, next);
+  };
+  // While a drawing tool is active the chart stops panning, so drags draw instead of scrolling.
+  useEffect(() => {
+    const on = tool === 'cursor';
+    chart.current?.applyOptions({ handleScroll: on, handleScale: on });
+  }, [tool]);
+
+  // Indicators: overlays on the candles, RSI in its own pane under them; recomputed with the data.
+  useEffect(() => {
+    const c = chart.current;
+    if (!c) return;
+    const have = indSeries.current;
+    const want = new Set<string>();
+    const sorted = [...bars.current.values()].sort((a, b) => a.time - b.time);
+    const line = (key: string, color: string, data: { time: number; value: number }[], pane = 0, width = 1.5, dashed = false) => {
+      want.add(key);
+      let sr = have.get(key);
+      if (!sr) {
+        sr = c.addSeries(LineSeries, { color, lineWidth: width as 1, lineStyle: dashed ? LineStyle.Dashed : LineStyle.Solid, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, priceFormat: { type: 'custom', formatter: (p: number) => (pane ? p.toFixed(0) : usdPrecise(p)), minMove: 1e-12 } }, pane);
+        have.set(key, sr);
+        if (key === 'rsi') {
+          sr.createPriceLine({ price: 70, color: 'rgba(255,107,91,.5)', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: '' });
+          sr.createPriceLine({ price: 30, color: 'rgba(61,220,151,.5)', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: '' });
+        }
+      }
+      sr.setData(data.map((d) => ({ time: d.time as UTCTimestamp, value: d.value })));
+    };
+    const color = (id: IndicatorId) => INDICATORS.find((i) => i.id === id)!.color;
+    if (inds.includes('ma20')) line('ma20', color('ma20'), sma(sorted, 20));
+    if (inds.includes('ema50')) line('ema50', color('ema50'), ema(sorted, 50));
+    if (inds.includes('bb')) {
+      const b = bollinger(sorted);
+      line('bbu', color('bb'), b.upper, 0, 1);
+      line('bbm', color('bb'), b.mid, 0, 1, true);
+      line('bbl', color('bb'), b.lower, 0, 1);
+    }
+    if (inds.includes('vwap')) line('vwap', color('vwap'), vwap(sorted));
+    if (inds.includes('rsi')) line('rsi', color('rsi'), rsi(sorted), 1);
+    for (const [k, sr] of [...have]) if (!want.has(k)) { c.removeSeries(sr); have.delete(k); }
+    const panes = c.panes();
+    if (panes.length > 1) panes[1]!.setHeight(Math.max(56, Math.min(110, Math.round((box.current?.clientHeight ?? 300) * 0.24))));
+  }, [inds, base, scale, lastBar]);
+
   const ownHere = legend ? ownByBar.get(legend.time) : undefined;
   const empty = base != null && base.length === 0 && !(trades?.length && FROM_TRADES.has(interval));
   const hydrating = isHydrating(hydration);
@@ -404,6 +484,7 @@ export function PriceChart({
             {i}
           </button>
         ))}
+        <ChartTools.IndicatorsMenu value={inds} onChange={setInds} />
         <div className="ml-auto flex shrink-0 gap-1 pl-2">
           {calls != null && (
             <ChipToggle on={showCalls} onClick={() => setShowCalls(!showCalls)} label="Calls" />
@@ -424,10 +505,27 @@ export function PriceChart({
         </div>
       </div>
       <div className="relative min-h-0 flex-1">
-        <div ref={box} className="absolute inset-0" />
+        <div ref={box} className="absolute inset-y-0 right-0" style={{ left: STRIP_W }} />
+        <ChartTools.Strip tool={tool} onTool={setTool} magnet={magnet} onMagnet={setMagnet} hidden={hideDrawings} onHidden={setHideDrawings} count={items.length} onClear={() => commit([])} />
+        {tool !== 'cursor' && (
+          <ChartTools.Overlay
+            tool={tool}
+            chart={chart}
+            api={drawings}
+            magnet={magnet}
+            barAt={(t) => {
+              const k = bars.current.get(t);
+              return k ? { open: k.open / scale, high: k.high / scale, low: k.low / scale, close: k.close / scale } : undefined;
+            }}
+            step={INTERVALS[interval]}
+            onAdd={(d) => commit([...items, d])}
+            onErase={(id) => commit(items.filter((x) => x.id !== id))}
+            onDone={() => setTool('cursor')}
+          />
+        )}
         {legend && (
           // right-[76px]: stays clear of the price axis column, so it never covers the top label.
-          <div className="pointer-events-none absolute left-3 right-[76px] top-1 z-10 flex flex-wrap gap-x-2.5 font-mono text-[11px] text-muted">
+          <div className="pointer-events-none absolute left-[52px] right-[76px] top-1 z-10 flex flex-wrap gap-x-2.5 font-mono text-[11px] text-muted">
             <span>
               O <span className={up ? 'text-brand' : 'text-risk-high'}>{usdPrecise(legend.open)}</span>
             </span>
