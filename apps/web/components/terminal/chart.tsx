@@ -168,7 +168,7 @@ export function PriceChart({
       rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.18, bottom: 0.22 }, entireTextOnly: true, minimumWidth: 64 },
       timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false, rightOffset: RIGHT_OFFSET, barSpacing: BAR_SPACING },
       crosshair: { horzLine: { color: 'rgba(255,255,255,0.2)' }, vertLine: { color: 'rgba(255,255,255,0.2)' } },
-      localization: { priceFormatter: (p: number) => usdPrecise(p) },
+      // prices are formatted per series (candles in dollars, RSI as a plain 0-100), not chart-wide
     });
     candles.current = c.addSeries(CandlestickSeries, {
       upColor: UP, downColor: DOWN, borderVisible: false, wickUpColor: UP, wickDownColor: DOWN,
