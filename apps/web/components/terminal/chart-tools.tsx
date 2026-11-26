@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { IChartApi } from 'lightweight-charts';
 import { INDICATORS, TWO_POINT, type DrawPoint, type Drawing, type Drawings, type IndicatorId, type Tool } from './drawings';
 
@@ -195,16 +196,187 @@ function Overlay(p: {
   );
 }
 
+const KIND_NAME: Record<Drawing['kind'], string> = {
+  trend: 'Trend line', ray: 'Ray', hline: 'Horizontal level', rect: 'Rectangle', fib: 'Fib retracement', measure: 'Measure',
+};
+
+/**
+ * Editing in cursor mode: click a drawing to select it, drag it to move it, drag an end to reshape it,
+ * Delete / Backspace removes it. Clicks that miss every drawing go to the chart as usual (pan, zoom).
+ */
+function Editor(p: {
+  area: MutableRefObject<HTMLDivElement | null>;
+  pane: MutableRefObject<HTMLDivElement | null>;
+  chart: MutableRefObject<IChartApi | null>;
+  api: MutableRefObject<Drawings | null>;
+  active: boolean;
+  items: Drawing[];
+  selected: string | null;
+  onSelect: (id: string | null) => void;
+  onChange: (items: Drawing[]) => void;
+}) {
+  const st = useRef(p);
+  st.current = p;
+  useEffect(() => {
+    const area = p.area.current;
+    if (!area) return;
+    let drag: { mode: 'a' | 'b' | 'move'; d: Drawing; from: DrawPoint } | null = null;
+    let live: Drawing[] | null = null;
+    const local = (e: { clientX: number; clientY: number }) => {
+      const el = st.current.pane.current;
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      const x = e.clientX - r.left, y = e.clientY - r.top;
+      const c = st.current.chart.current;
+      const right = r.width - (c?.priceScale('right').width() ?? 0);
+      const bottom = r.height - (c?.timeScale().height() ?? 0);
+      return x >= 0 && x <= right && y >= 0 && y <= bottom ? { x, y } : null;
+    };
+    const down = (e: PointerEvent) => {
+      const s = st.current;
+      const api = s.api.current;
+      if (!s.active || !api || e.button !== 0) return;
+      const at = local(e);
+      if (!at) return;
+      const end = s.selected ? api.handleAt(at.x, at.y) : null;
+      const target = end ? s.items.find((i) => i.id === s.selected) ?? null : api.hit(at.x, at.y);
+      if (!target) {
+        if (s.selected) s.onSelect(null);
+        return;
+      }
+      const from = api.point(at.x, at.y);
+      if (!from) return;
+      e.stopPropagation();
+      e.preventDefault();
+      if (target.id !== s.selected) s.onSelect(target.id);
+      drag = { mode: end ?? 'move', d: target, from };
+      area.style.cursor = 'grabbing';
+    };
+    // the chart pans on mouse / touch down: swallow those while a drawing is grabbed
+    const block = (e: Event) => {
+      if (drag) e.stopPropagation();
+    };
+    const move = (e: PointerEvent) => {
+      const s = st.current;
+      const api = s.api.current;
+      if (!api) return;
+      if (!drag) {
+        if (!s.active) return;
+        const at = local(e);
+        area.style.cursor = !at ? '' : s.selected && api.handleAt(at.x, at.y) ? 'grab' : api.hit(at.x, at.y) ? 'pointer' : '';
+        return;
+      }
+      const el = s.pane.current?.getBoundingClientRect();
+      if (!el) return;
+      const pt = api.point(e.clientX - el.left, e.clientY - el.top);
+      if (!pt) return;
+      const d = drag.d;
+      let next: Drawing;
+      if (drag.mode === 'move') {
+        const dt = d.kind === 'hline' ? 0 : pt.t - drag.from.t;
+        const dp = pt.p - drag.from.p;
+        next = { ...d, a: { t: d.a.t + dt, p: d.a.p + dp }, b: { t: d.b.t + dt, p: d.b.p + dp } };
+      } else next = { ...d, [drag.mode]: pt };
+      live = s.items.map((i) => (i.id === d.id ? next : i));
+      api.set(live);
+    };
+    const up = () => {
+      if (!drag) return;
+      drag = null;
+      area.style.cursor = '';
+      if (live) st.current.onChange(live);
+      live = null;
+    };
+    const key = (e: KeyboardEvent) => {
+      const s = st.current;
+      if (!s.selected || (e.target as HTMLElement).closest('input,textarea,[contenteditable="true"]')) return;
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        s.onChange(s.items.filter((i) => i.id !== s.selected));
+        s.onSelect(null);
+      } else if (e.key === 'Escape') s.onSelect(null);
+    };
+    area.addEventListener('pointerdown', down, true);
+    area.addEventListener('mousedown', block, true);
+    area.addEventListener('touchstart', block, true);
+    addEventListener('pointermove', move);
+    addEventListener('pointerup', up);
+    addEventListener('keydown', key);
+    return () => {
+      area.removeEventListener('pointerdown', down, true);
+      area.removeEventListener('mousedown', block, true);
+      area.removeEventListener('touchstart', block, true);
+      removeEventListener('pointermove', move);
+      removeEventListener('pointerup', up);
+      removeEventListener('keydown', key);
+    };
+  }, [p.area]);
+  useEffect(() => {
+    p.api.current?.setSelected(p.selected);
+  }, [p.selected, p.api]);
+
+  const d = p.items.find((i) => i.id === p.selected);
+  if (!d) return null;
+  return (
+    <div
+      className="absolute bottom-9 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-xl border border-white/[0.09] py-1 pl-3 pr-1 text-[12px] shadow-xl"
+      style={{ background: 'rgba(18,19,23,.96)', backdropFilter: 'blur(12px)' }}
+    >
+      <span className="mr-1 text-ink/85">{KIND_NAME[d.kind]}</span>
+      <span className="mr-1 hidden text-[11px] text-muted md:inline">drag to move · drag an end to reshape</span>
+      <button
+        type="button"
+        title="Delete (Del)"
+        onClick={() => {
+          p.onChange(p.items.filter((i) => i.id !== d.id));
+          p.onSelect(null);
+        }}
+        className="flex items-center gap-1 rounded-lg px-2 py-1 text-risk-high hover:bg-risk-high/15"
+      >
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></svg>
+        Delete
+      </button>
+      <button type="button" title="Done (Esc)" onClick={() => p.onSelect(null)} className="grid size-6 place-items-center rounded-lg text-muted hover:bg-white/[0.07] hover:text-ink">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg>
+      </button>
+    </div>
+  );
+}
+
+const IND_HINT: Record<IndicatorId, string> = {
+  ma20: 'Average close of the last 20 candles',
+  ema50: 'Trend, weighted to recent candles',
+  bb: 'Volatility channel around MA 20',
+  vwap: 'Average price weighted by volume',
+  rsi: 'Momentum 0–100: over 70 hot, under 30 cold',
+};
+
 /** The "Indicators" menu in the chart's header. */
 function IndicatorsMenu({ value, onChange }: { value: IndicatorId[]; onChange: (v: IndicatorId[]) => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
-    const close = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    const close = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node) && !menu.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    const shut = () => setOpen(false);
     addEventListener('mousedown', close);
-    return () => removeEventListener('mousedown', close);
+    addEventListener('keydown', esc);
+    addEventListener('scroll', shut);
+    addEventListener('resize', shut);
+    return () => {
+      removeEventListener('mousedown', close);
+      removeEventListener('keydown', esc);
+      removeEventListener('scroll', shut);
+      removeEventListener('resize', shut);
+    };
   }, [open]);
+  const r = open ? ref.current?.getBoundingClientRect() : undefined;
   return (
     <div ref={ref} className="relative ml-2 shrink-0">
       <button
@@ -213,31 +385,50 @@ function IndicatorsMenu({ value, onChange }: { value: IndicatorId[]; onChange: (
         className={`flex items-center gap-1.5 rounded-md px-2 py-1 ${open || value.length ? 'bg-ink/[0.08] text-ink' : 'text-muted hover:text-ink'}`}
       >
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden><path d="M3 17l5-6 4 4 8-10" /></svg>
-        Indicators{value.length ? ` ${value.length}` : ''}
+        Indicators
+        {value.length > 0 && <span className="rounded bg-ink/[0.14] px-1.5 text-[10px] tabular-nums">{value.length}</span>}
       </button>
-      {open && (
-        <div className="fixed z-50 mt-1 w-56 rounded-xl border border-ink/[0.1] bg-surface p-1.5 shadow-2xl" style={{ top: ref.current ? ref.current.getBoundingClientRect().bottom + 4 : 0, left: ref.current ? ref.current.getBoundingClientRect().left : 0 }}>
+      {open && r && createPortal(
+        <div
+          ref={menu}
+          className="fixed z-[100] w-[300px] overflow-hidden rounded-2xl border border-white/[0.08] p-1.5 shadow-[0_18px_50px_rgba(0,0,0,.6)]"
+          style={{ top: r.bottom + 6, left: r.left, background: 'rgba(16,17,21,.98)', backdropFilter: 'blur(16px)' }}
+        >
+          <div className="flex items-center justify-between px-2.5 pb-1.5 pt-1">
+            <span className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted">Indicators</span>
+            {value.length > 0 && (
+              <button type="button" onClick={() => onChange([])} className="text-[11px] text-muted hover:text-ink">
+                Clear all
+              </button>
+            )}
+          </div>
           {INDICATORS.map((i) => {
             const on = value.includes(i.id);
             return (
               <button
                 key={i.id}
                 type="button"
+                role="switch"
+                aria-checked={on}
                 onClick={() => onChange(on ? value.filter((x) => x !== i.id) : [...value, i.id])}
-                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] hover:bg-ink/[0.06]"
+                className={`flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition ${on ? 'bg-white/[0.05]' : 'hover:bg-white/[0.035]'}`}
               >
-                <span className={`grid size-4 place-items-center rounded border ${on ? 'border-transparent' : 'border-ink/25'}`} style={on ? { background: i.color } : undefined}>
-                  {on && <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#0b0b0f" strokeWidth="3.2" aria-hidden><path d="M5 12l5 5 9-10" /></svg>}
+                <span className="h-7 w-[3px] shrink-0 rounded-full transition" style={{ background: i.color, opacity: on ? 1 : 0.3 }} />
+                <span className="min-w-0 flex-1">
+                  <span className={`block text-[13px] font-medium ${on ? 'text-ink' : 'text-ink/75'}`}>{i.name}</span>
+                  <span className="block truncate text-[11px] text-muted">{IND_HINT[i.id]}</span>
                 </span>
-                <span className="flex-1">{i.name}</span>
-                <span className="h-0.5 w-4 rounded" style={{ background: i.color }} />
+                <span className="relative h-[18px] w-8 shrink-0 rounded-full transition" style={{ background: on ? i.color : 'rgba(255,255,255,.1)' }}>
+                  <span className={`absolute top-[2px] size-[14px] rounded-full bg-white shadow transition-all ${on ? 'left-[16px]' : 'left-[2px]'}`} />
+                </span>
               </button>
             );
           })}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
 }
 
-export const ChartTools = { Strip, Overlay, IndicatorsMenu };
+export const ChartTools = { Strip, Overlay, IndicatorsMenu, Editor };

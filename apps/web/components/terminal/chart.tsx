@@ -127,6 +127,8 @@ export function PriceChart({
   const scaleRef = useRef(scale);
   scaleRef.current = scale;
   const [tool, setTool] = useState<Tool>('cursor');
+  const [selected, setSelected] = useState<string | null>(null);
+  const area = useRef<HTMLDivElement>(null);
   const [items, setItems] = useState<Drawing[]>([]);
   const [hideDrawings, setHideDrawings] = useState(false);
   const [magnet, setMagnet] = useState(true);
@@ -410,6 +412,7 @@ export function PriceChart({
 
   useEffect(() => {
     setItems(loadDrawings(address));
+    setSelected(null);
   }, [address]);
   useEffect(() => {
     drawings.current?.set(items);
@@ -504,9 +507,10 @@ export function PriceChart({
           ))}
         </div>
       </div>
-      <div className="relative min-h-0 flex-1">
+      <div ref={area} className="relative min-h-0 flex-1">
         <div ref={box} className="absolute inset-y-0 right-0" style={{ left: STRIP_W }} />
         <ChartTools.Strip tool={tool} onTool={setTool} magnet={magnet} onMagnet={setMagnet} hidden={hideDrawings} onHidden={setHideDrawings} count={items.length} onClear={() => commit([])} />
+        <ChartTools.Editor area={area} pane={box} chart={chart} api={drawings} active={tool === 'cursor' && !hideDrawings} items={items} selected={tool === 'cursor' ? selected : null} onSelect={setSelected} onChange={commit} />
         {tool !== 'cursor' && (
           <ChartTools.Overlay
             tool={tool}
@@ -518,7 +522,7 @@ export function PriceChart({
               return k ? { open: k.open / scale, high: k.high / scale, low: k.low / scale, close: k.close / scale } : undefined;
             }}
             step={INTERVALS[interval]}
-            onAdd={(d) => commit([...items, d])}
+            onAdd={(d) => { commit([...items, d]); if (d.kind !== 'measure') setSelected(d.id); }}
             onErase={(id) => commit(items.filter((x) => x.id !== id))}
             onDone={() => setTool('cursor')}
           />

@@ -40,6 +40,7 @@ export class Drawings implements ISeriesPrimitive<Time> {
   private items: Drawing[] = [];
   private draft: Drawing | null = null;
   private hidden = false;
+  private sel: string | null = null;
   private readonly view: IPrimitivePaneView;
 
   constructor(private readonly ctx: DrawContext) {
@@ -69,6 +70,20 @@ export class Drawings implements ISeriesPrimitive<Time> {
   setDraft(d: Drawing | null) {
     this.draft = d;
     this.request?.();
+  }
+  setSelected(id: string | null) {
+    this.sel = id;
+    this.request?.();
+  }
+  /** Which end of the selected drawing is under a pane point (within 9 px). */
+  handleAt(x: number, y: number): 'a' | 'b' | null {
+    const d = this.items.find((i) => i.id === this.sel);
+    if (!d || d.kind === 'hline') return null;
+    for (const k of ['b', 'a'] as const) {
+      const px = this.x(d[k].t), py = this.y(d[k].p);
+      if (px != null && py != null && Math.hypot(px - x, py - y) <= 9) return k;
+    }
+    return null;
   }
   setHidden(h: boolean) {
     this.hidden = h;
@@ -162,19 +177,21 @@ export class Drawings implements ISeriesPrimitive<Time> {
         c.strokeStyle = color;
         c.lineWidth = 1.5 * hr;
         c.beginPath();
-        c.arc(x, y, 3.5 * hr, 0, Math.PI * 2);
+        c.arc(x, y, 4.5 * hr, 0, Math.PI * 2);
         c.fill();
         c.stroke();
       };
       for (const d of all) {
+        const on = d.id === this.sel || d === this.draft;
+        const lw = on ? 1.4 : 1;
         const ax0 = this.x(d.a.t), ay0 = this.y(d.a.p), bx0 = this.x(d.b.t), by0 = this.y(d.b.p);
         if (ax0 == null || ay0 == null) continue;
         const ax = ax0 * hr, ay = ay0 * vr;
         const scaleK = this.ctx.scale();
         if (d.kind === 'hline') {
           c.strokeStyle = LINE;
-          c.lineWidth = 1.3 * hr;
-          c.setLineDash([6 * hr, 4 * hr]);
+          c.lineWidth = 1.3 * lw * hr;
+          c.setLineDash(on ? [] : [6 * hr, 4 * hr]);
           c.beginPath();
           c.moveTo(0, ay);
           c.lineTo(W, ay);
@@ -193,13 +210,11 @@ export class Drawings implements ISeriesPrimitive<Time> {
             ey = ay + (by - ay) * k;
           }
           c.strokeStyle = LINE;
-          c.lineWidth = 1.6 * hr;
+          c.lineWidth = 1.6 * lw * hr;
           c.beginPath();
           c.moveTo(ax, ay);
           c.lineTo(ex, ey);
           c.stroke();
-          dot(ax, ay, LINE);
-          dot(bx, by, LINE);
         } else if (d.kind === 'rect') {
           c.fillStyle = 'rgba(120,186,230,.12)';
           c.strokeStyle = 'rgba(120,186,230,.75)';
@@ -256,6 +271,10 @@ export class Drawings implements ISeriesPrimitive<Time> {
           const mins = Math.round(Math.abs(d.b.t - d.a.t) / 60);
           const span = mins >= 1440 ? `${(mins / 1440).toFixed(1)}d` : mins >= 60 ? `${(mins / 60).toFixed(1)}h` : `${mins}m`;
           label(`${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%  ·  ${bars} bars  ·  ${span}`, (ax + bx) / 2, Math.min(ay, by) - 14 * vr, col, 'center');
+        }
+        if (on) {
+          dot(ax, ay, d.kind === 'measure' ? '#fff' : LINE);
+          dot(bx, by, d.kind === 'measure' ? '#fff' : LINE);
         }
       }
     });
