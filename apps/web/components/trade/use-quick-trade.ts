@@ -261,7 +261,10 @@ export function useQuickTrade(tokenArg: TradeToken) {
   const inflight = useRef(new Map<string, Promise<QuickTrade | null>>());
   const lastReq = useRef<{ side: 'buy' | 'sell'; amount: bigint } | null>(null);
   const sending = useRef(false);
-  const wallet = (session.user?.wallet ?? undefined) as Address | undefined;
+  // Signed in with their own wallet (MetaMask, OKX…): trade from it, with the wallet's own confirmation.
+  // Email sign-ins trade from the embedded Overmind wallet, silently.
+  const external = !!session.user?.externalWallet;
+  const wallet = (session.user?.externalWallet ?? session.user?.wallet ?? undefined) as Address | undefined;
   const trader = wallet ?? GUEST;
 
   // Someone who signed in here before: load the wallet SDK now (not after the idle delay). Visitors load
@@ -450,7 +453,7 @@ export function useQuickTrade(tokenArg: TradeToken) {
         let swap: { hash: Hex; receipt: SendResult['receipt'] } | null = null;
         for (const [i, c] of t.calls.entries()) {
           setStatus({ kind: 'sending', step: i + 1, total, label: c.label === 'swap' ? r.side : c.label });
-          res = await sendWithRetry(pipe, c, (hash) => {
+          res = await (external ? externalSend : sendWithRetry)(pipe, c, (hash) => {
             lastHash = hash;
             setStatus({ kind: 'pending', hash, step: i + 1, total });
             if (c.label === 'swap') {
@@ -467,7 +470,8 @@ export function useQuickTrade(tokenArg: TradeToken) {
         }
         // Curve trades: the fee transfer, from the confirmed trade's receipt. Queued now so it takes the
         // next nonce (before any pre-approval below); it runs in the background.
-        const feeCall = swap ? tradeFollowUpFee(t, swap.receipt) : null;
+        // From an external wallet this would be a second confirmation popup right after the trade: skipped.
+        const feeCall = swap && !external ? tradeFollowUpFee(t, swap.receipt) : null;
         if (swap && feeCall) void sendFollowUpFee(pipe, feeCall, swap.hash);
         const done = performance.now();
         const tm: TradeTimings = {
@@ -488,7 +492,8 @@ export function useQuickTrade(tokenArg: TradeToken) {
         setStatus({ kind: 'success', hash: lastHash!, url: explorerTxUrl(lastHash!), ms: done - click });
         emit({ ...base, phase: 'confirmed', hash: lastHash, expectedOut: t.quote?.amountOut.toString() ?? null, timings: tm });
         // After a buy: approve the token for selling now, in the background, so the sell is one tx.
-        if (r.side === 'buy' && t.sellApprovals.length) void preApprove(pipe, t.sellApprovals);
+        // (Not from an external wallet: it would pop up confirmations nobody asked for; the sell includes them.)
+        if (r.side === 'buy' && t.sellApprovals.length && !external) void preApprove(pipe, t.sellApprovals);
       } catch (e) {
         // A curve trade that reverted because the curve graduated in the meantime: say so; the pools
         // cache is dropped below, so the next attempt routes to the new Uniswap pool.
@@ -504,7 +509,7 @@ export function useQuickTrade(tokenArg: TradeToken) {
         if (lastReq.current) warm(lastReq.current.side, lastReq.current.amount);
       }
     },
-    [session.authenticated, wallet, token, get, warm],
+    [session.authenticated, wallet, external, token, get, warm],
   );
 
   return { session, wallet, trade, status, prepare, warm, execute, ack, setAck, safety, settings, timings };
@@ -550,6 +555,17 @@ async function sendFollowUpFee(pipe: TxPipeline, call: WalletCall, tradeHash: He
   } catch (e) {
     console.warn('[overmind trade] fee transfer not sent:', friendly(e));
   }
+}
+
+/** The external wallet the user signed in with signs and broadcasts, after its own confirmation. */
+async function externalSend(pipe: TxPipeline, call: WalletCall, onSubmitted: (h: Hex) => void): Promise<SendResult> {
+  const t1 = performance.now();
+  const hash = await auth.sendExternal({ to: call.to, data: call.data, value: call.value, gas: call.gas });
+  const t2 = performance.now();
+  pipe.resetNonce();
+  onSubmitted(hash);
+  const receipt = await chainClient().waitForTransactionReceipt({ hash, pollingInterval: 250, timeout: 120_000 });
+  return { hash, receipt, timings: { prepMs: 0, signMs: t2 - t1, confirmMs: performance.now() - t2, via: 'poll' } };
 }
 
 /** The wallet signs and broadcasts (Privy fills nonce/fees itself); receipt polled every 150ms. */

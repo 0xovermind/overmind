@@ -60,6 +60,8 @@ export interface AuthActions {
   getAccessToken(): Promise<string | null>;
   /** Link another external wallet to the account (Hive Pro counts $OVHIVE on every linked wallet). */
   linkWallet(): void;
+  /** Send from the external wallet the user signed in with (MetaMask, OKX…): the wallet shows its own confirmation. */
+  sendExternal(tx: TxRequest): Promise<`0x${string}`>;
 }
 
 const APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID ?? '';
@@ -119,6 +121,7 @@ export const auth = {
   },
   getAccessToken: () => (actions ? actions.getAccessToken() : Promise.resolve(null)),
   linkWallet: () => actions?.linkWallet(),
+  sendExternal: (tx: TxRequest) => (actions ? actions.sendExternal(tx) : Promise.reject(notReady())),
 };
 
 export function useAuth(): AuthState {

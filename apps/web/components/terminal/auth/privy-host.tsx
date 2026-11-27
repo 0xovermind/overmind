@@ -105,9 +105,20 @@ function Bridge() {
       },
       getAccessToken,
       linkWallet: () => linkWallet(),
+      async sendExternal(tx) {
+        const ext = wallets.find((w) => w.walletClientType !== 'privy');
+        if (!ext) throw new Error('No connected wallet');
+        await ext.switchChain(robinhoodChain.id);
+        const provider = await ext.getEthereumProvider();
+        const hex = (v: bigint | undefined) => (v == null ? undefined : `0x${v.toString(16)}`);
+        return (await provider.request({
+          method: 'eth_sendTransaction',
+          params: [{ from: ext.address, to: tx.to, data: tx.data, value: hex(tx.value), gas: hex(tx.gas) }],
+        })) as `0x${string}`;
+      },
     });
     return () => setAuthActions(null);
-  }, [login, logout, exportWallet, sendTransaction, signTransaction, getAccessToken, linkWallet, embedded]);
+  }, [login, logout, exportWallet, sendTransaction, signTransaction, getAccessToken, linkWallet, embedded, wallets]);
 
   return null;
 }
