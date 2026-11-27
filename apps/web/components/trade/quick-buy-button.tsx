@@ -21,7 +21,7 @@ import { useKeepWarm, useQuickTrade, type TradeToken } from './use-quick-trade';
  * trade card; otherwise `amountEth`, or the quick-buy amount from settings.
  */
 export function QuickBuyButton({ token, amountEth, amountUsd, variant = 'solid' }: { token: TradeToken; amountEth?: string; amountUsd?: number; variant?: 'solid' | 'subtle' }) {
-  if (!tradingAvailable()) return null;
+  if (!tradingAvailable(token.address)) return null;
   return <QuickBuyInner token={token} amountEth={amountEth} amountUsd={amountUsd} variant={variant} />;
 }
 

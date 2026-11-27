@@ -25,7 +25,7 @@ import { SHOW_RISK } from '@/lib/risk-labels';
  * broadcast, and re-read on confirmation and whenever the live feed shows a trade from this wallet.
  */
 export function TradePanel(props: { token: TradeToken; priceUsd: number | null; position: LivePosition }) {
-  if (!tradingAvailable()) return null;
+  if (!tradingAvailable(props.token.address)) return null;
   return <Panel {...props} />;
 }
 

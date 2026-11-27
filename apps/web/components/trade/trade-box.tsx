@@ -15,7 +15,7 @@ import { SHOW_RISK } from '@/lib/risk-labels';
  * and signing go through lib/auth (one Privy setup); settings come from /settings.
  */
 export function TradeBox({ token }: { token: TradeToken }) {
-  if (!tradingAvailable()) return null;
+  if (!tradingAvailable(token.address)) return null;
   return <TradeBoxInner token={token} />;
 }
 

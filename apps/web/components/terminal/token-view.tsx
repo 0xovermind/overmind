@@ -130,7 +130,7 @@ export function TokenView({
   const pro = useSettings().proMode;
   const desktop = useMediaQuery('(min-width: 1024px)');
   const [sheet, setSheet] = useState<'buy' | 'sell' | null>(null);
-  const trading = tradingAvailable();
+  const trading = tradingAvailable(t.address);
   const tradeToken = {
     address: t.address as `0x${string}`,
     symbol: t.symbol,

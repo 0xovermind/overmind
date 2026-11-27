@@ -786,7 +786,7 @@ const Row = memo(function Row({
             )}
           </span>
           <span className="relative z-10 ml-auto flex shrink-0 items-center gap-1">
-            {tradingAvailable() ? (
+            {tradingAvailable(tradeToken.address) ? (
               <>
                 <QuickBuyButton token={tradeToken} amountUsd={quick} variant="subtle" />
                 <QuickBuyButton token={tradeToken} amountUsd={quick2} variant="subtle" />

@@ -23,7 +23,7 @@ import { SHOW_RISK } from '@/lib/risk-labels';
  * quote details sit behind the gear, next to the Pro mode switch.
  */
 export function SimpleTrade(props: { token: TradeToken; priceUsd: number | null; initialSide?: Side; onDone?: () => void; position?: LivePosition | null }) {
-  if (!tradingAvailable()) return null;
+  if (!tradingAvailable(props.token.address)) return null;
   return <Card {...props} />;
 }
 
