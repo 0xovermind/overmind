@@ -381,6 +381,8 @@ export async function hiveToken(sql: Sql, token: string) {
 }
 
 export interface SmartTrade {
+  /** Stable unique id of the trade (salted hash of tx and log index): dedupes without revealing the tx or the wallet. */
+  id: string;
   /** unix seconds */
   time: number;
   side: 'buy' | 'sell';
@@ -391,16 +393,16 @@ export interface SmartTrade {
  * The smart set's own swaps on one token (the same set its hive score reads), for marks on the chart.
  * Only time, side and size: which wallets are in the set stays private.
  */
-export async function smartTrades(sql: Sql, token: string, days = 7): Promise<SmartTrade[]> {
+export async function smartTrades(sql: Sql, token: string, days = 7, salt = ''): Promise<SmartTrade[]> {
   const smart = await smartWallets(sql, await scopeOf(sql, token));
   if (!smart.length) return [];
-  const rows = await sql<{ time: number; side: 'buy' | 'sell'; usd: number | null }[]>`
-    select extract(epoch from s.time)::int as time, s.side, s.usd::float8 as usd
+  const rows = await sql<{ id: string; time: number; side: 'buy' | 'sell'; usd: number | null }[]>`
+    select left(md5(${salt} || s.tx || ':' || s.log_index::text), 20) as id, extract(epoch from s.time)::int as time, s.side, s.usd::float8 as usd
     from swaps s
     where s.token = ${token}
       and s.trader = any(${smart}::text[])
       and s.time > now() - make_interval(days => ${Math.min(Math.max(days, 1), 30)})
     order by s.time
     limit 3000`;
-  return rows.map((r) => ({ time: Number(r.time), side: r.side, usd: Number(r.usd ?? 0) }));
+  return rows.map((r) => ({ id: r.id, time: Number(r.time), side: r.side, usd: Number(r.usd ?? 0) }));
 }

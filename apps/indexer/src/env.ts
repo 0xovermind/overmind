@@ -14,6 +14,8 @@ export interface Env {
   ADMIN_TOKEN?: string;
   /** RH Radar API key (Telegram calls and DexScreener promotions per token), see radar.ts. */
   RHR_API_KEY?: string;
+  /** Secret salt for public trade ids (smart trades): stable ids that can't be matched back to a tx. */
+  TRADE_ID_SALT?: string;
   DATABASE_URL?: string;
   /** First run only: how many blocks before head to start from (default 33000 ≈ 1h). */
   START_BLOCKS_BACK?: string;

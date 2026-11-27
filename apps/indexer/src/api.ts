@@ -362,7 +362,7 @@ api.get('/hive/:address/history', async (c) =>
   c.json({ points: await hiveHistory(c.var.sql, addr(c.req.param('address')), 1) }, 200, cache(60)));
 /** The smart set's buys and sells on a token (time, side, size; no wallets), for marks on the chart. */
 api.get('/hive/:address/trades', async (c) =>
-  c.json({ trades: await smartTrades(c.var.sql, addr(c.req.param('address')), Number(c.req.query('days') ?? 7) || 7) }, 200, cache(30)));
+  c.json({ trades: await smartTrades(c.var.sql, addr(c.req.param('address')), Number(c.req.query('days') ?? 7) || 7, c.env.TRADE_ID_SALT ?? '') }, 200, cache(30)));
 /** Telegram calls and DexScreener promotions on a token, from RH Radar (cached; see radar.ts). */
 api.get('/radar/:address', async (c) => c.json(await radarRead(c.env, addr(c.req.param('address'))), 200, cache(60)));
 api.get('/hive/:address', async (c) => c.json({ consensus: await hiveToken(c.var.sql, addr(c.req.param('address'))) }, 200, cache(20)));
