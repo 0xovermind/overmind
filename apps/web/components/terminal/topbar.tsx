@@ -82,6 +82,9 @@ function OvhiveChip() {
       <Link href="/burns" className="border-l border-ink/[0.08] px-2 py-1.5 text-xs transition hover:bg-ink/[0.05]" title="$OVHIVE burns">
         🔥
       </Link>
+      <Link href="/pro" className="border-l border-ink/[0.08] px-2 py-1.5 text-xs transition hover:bg-ink/[0.05]" title="Hive Pro: what holding $OVHIVE unlocks">
+        🧠
+      </Link>
       <a
         href={OVHIVE_TRADE_URL}
         target="_blank"

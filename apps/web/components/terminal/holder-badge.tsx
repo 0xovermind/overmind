@@ -5,7 +5,7 @@ export type OvhiveTier = 'holder' | 'bee' | 'pro' | 'queen';
 const TIERS: Record<OvhiveTier, { icon: string; label: string; title: string }> = {
   holder: { icon: '🐝', label: 'Holder', title: 'Holds $OVHIVE' },
   bee: { icon: '🐝', label: 'Bee', title: 'Holds 100K+ $OVHIVE' },
-  pro: { icon: '🐝🐝', label: 'Hive Pro', title: 'Holds 1M+ $OVHIVE (Hive Pro)' },
+  pro: { icon: '🧠', label: 'Hive Pro', title: 'Holds 1M+ $OVHIVE (Hive Pro)' },
   queen: { icon: '👑', label: 'Queen', title: 'Holds 10M+ $OVHIVE' },
 };
 
