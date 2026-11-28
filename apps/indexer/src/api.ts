@@ -20,6 +20,7 @@ import { asScope, asTrendWindow, hiveBoard, hiveDaily, hiveHistory, hiveToken, h
 import { hiveSignals, pendingSignals, PUBLIC_DELAY } from './signals-hive';
 import { BurnsNotReady, ovhiveBurns } from './burns';
 import { devWallet } from './dev-wallet';
+import { partner } from './partner';
 
 type Ctx = { Bindings: Env; Variables: { sql: Sql } };
 
@@ -371,6 +372,8 @@ api.get('/radar/:address', async (c) => c.json(await radarRead(c.env, addr(c.req
 api.get('/hive/:address', async (c) => c.json({ consensus: await hiveToken(c.var.sql, addr(c.req.param('address'))) }, 200, cache(20)));
 /** The top traders: the smart set with each wallet's best token and current holdings (see hive.ts). */
 api.get('/traders', async (c) => c.json(await smartTraders(c.var.sql, Math.min(Number(c.req.query('limit') ?? 100) || 100, 300)), 200, cache(60)));
+/** Data partners (RH Radar / Atlas): smart trade history with anonymous wallet IDs, behind a partner key (partner.ts). */
+api.route('/partner', partner);
 
 /** Headline numbers for the landing page. */
 api.get('/stats', async (c) => {

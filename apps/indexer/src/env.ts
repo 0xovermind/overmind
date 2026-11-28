@@ -16,6 +16,8 @@ export interface Env {
   RHR_API_KEY?: string;
   /** Secret salt for public trade ids (smart trades): stable ids that can't be matched back to a tx. */
   TRADE_ID_SALT?: string;
+  /** Data partner keys, "name:key,name2:key2" (partner.ts: /partner/* behind Authorization: Bearer <key>). */
+  PARTNER_KEYS?: string;
   DATABASE_URL?: string;
   /** First run only: how many blocks before head to start from (default 33000 ≈ 1h). */
   START_BLOCKS_BACK?: string;
