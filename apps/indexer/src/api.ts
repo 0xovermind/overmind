@@ -16,7 +16,7 @@ import { page, repairBalances, walletHoldings, walletPosition } from './wallets'
 import { PAUSED_BODY, readPause } from './pause';
 import { TRANSPARENCY_CACHE_S, transparency } from './transparency';
 import { radarRead } from './radar';
-import { asScope, hiveBoard, hiveDaily, hiveHistory, hiveToken, smartTrades, smartTraders } from './hive';
+import { asScope, asTrendWindow, hiveBoard, hiveDaily, hiveHistory, hiveToken, hiveTrending, smartTrades, smartTraders } from './hive';
 import { hiveSignals, pendingSignals, PUBLIC_DELAY } from './signals-hive';
 import { BurnsNotReady, ovhiveBurns } from './burns';
 import { devWallet } from './dev-wallet';
@@ -351,6 +351,9 @@ api.get('/ovhive/burns', async (c) => {
 api.get('/ovhive/dev', async (c) => c.json(await devWallet(c.var.sql), 200, cache(120)));
 /** Hive Daily: the smart set's biggest net buys and sells over the last 24h (board-clean tokens only). */
 api.get('/hive/daily', async (c) => c.json(await hiveDaily(c.var.sql, Number(c.req.query('limit') ?? 5), asScope(c.req.query('scope'))), 200, cache(300)));
+/** Trending with smart money: tokens ranked by smart wallets buying them over ?window=1h|6h|24h (default 24h). */
+api.get('/hive/trending', async (c) =>
+  c.json(await hiveTrending(c.var.sql, asTrendWindow(c.req.query('window')), Number(c.req.query('limit') ?? 30) || 30, asScope(c.req.query('scope'))), 200, cache(30)));
 /** Hive signals (flips of the smart crowd's side), delayed for the public; real time is /v1/hive/signals (Hive Pro). */
 api.get('/hive/signals', async (c) =>
   {

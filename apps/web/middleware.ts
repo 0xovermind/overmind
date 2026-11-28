@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { buildCsp, newNonce } from '@/components/trade/csp';
 
 /** Terminal routes: served on app.overmind.ink, with the strict per-request-nonce CSP (see components/trade/csp.ts). */
-const APP_ROUTES = /^\/(trenches|hive|swipe|signals|daily|arena|dna|radar|portfolio|season|burns|pro|token|feed|swap|settings|me|u|leaderboard|agents|watchlist|traders)(\/|$)/;
+const APP_ROUTES = /^\/(trenches|hive|swipe|signals|daily|arena|dna|radar|portfolio|season|burns|pro|trending|token|feed|swap|settings|me|u|leaderboard|agents|watchlist|traders)(\/|$)/;
 /** Landing, legal, whitepaper and transparency pages: served on overmind.ink. */
 const SITE_ROUTES = /^\/(terms|privacy|risk|whitepaper|transparency)(\/|$)/;
 const LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;

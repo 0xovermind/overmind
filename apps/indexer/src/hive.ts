@@ -406,3 +406,93 @@ export async function smartTrades(sql: Sql, token: string, days = 7, salt = ''):
     limit 3000`;
   return rows.map((r) => ({ id: r.id, time: Number(r.time), side: r.side, usd: Number(r.usd ?? 0) }));
 }
+
+export type TrendWindow = '1h' | '6h' | '24h';
+export const asTrendWindow = (v: unknown): TrendWindow => (v === '1h' || v === '6h' ? v : '24h');
+const TREND_INTERVAL: Record<TrendWindow, string> = { '1h': '1 hour', '6h': '6 hours', '24h': '24 hours' };
+
+export interface TrendingRow {
+  token: string; symbol: string; name: string; image_url: string | null; launchpad: string | null; status: string | null;
+  market_cap_usd: number | null; price_usd: number | null;
+  /** Smart wallets that added to the token in the window (net tokens and net USD both in). */
+  buyers: number;
+  /** Smart wallets that took money out or cut the position in the window. */
+  sellers: number;
+  trades: number;
+  buy_usd: number; sell_usd: number; net_usd: number;
+  /** Consensus of the window's smart wallets, -100..100. */
+  score: number;
+  /** Price change since the first trade of the window (any trader), percent. */
+  change_pct: number | null;
+  /** First smart buy of this token ever (unix seconds): recent means the smart crowd just found it. */
+  first_smart_at: number | null;
+  last_at: number;
+}
+
+/**
+ * Trending with smart money: tokens ranked by smart wallets buying them minus those selling over the window
+ * (1h, 6h or 24h), then by buyers and net dollars in. The same smart set and public filters as the hive board
+ * (no high risk, spam or copycats, at least MIN_AGE old). Which wallets are in the set stays private.
+ */
+export async function hiveTrending(sql: Sql, window: TrendWindow = '24h', limit = 30, scope: HiveScope = 'all') {
+  const smart = await smartWallets(sql, scope);
+  const iv = TREND_INTERVAL[window];
+  const n = Math.min(Math.max(limit, 1), 60);
+  const rows = smart.length
+    ? await sql<TrendingRow[]>`
+    with flow as (
+      select s.token, s.trader,
+        sum(case when s.side = 'buy' then coalesce(s.usd, 0) else -coalesce(s.usd, 0) end) as net_usd,
+        sum(case when s.side = 'buy' then s.token_amount else -s.token_amount end) as net_tok,
+        sum(case when s.side = 'buy' then coalesce(s.usd, 0) else 0 end) as buy_usd,
+        sum(case when s.side = 'sell' then coalesce(s.usd, 0) else 0 end) as sell_usd,
+        count(*) as trades, max(s.time) as last_at
+      from swaps s
+      where s.time > now() - ${iv}::interval and s.trader = any(${smart}::text[])
+      group by s.token, s.trader
+    ),
+    agg as (
+      select token,
+        count(*) filter (where net_tok > 0 and net_usd > 0)::int as buyers,
+        count(*) filter (where net_usd < 0 or net_tok < 0)::int as sellers,
+        sum(trades)::int as trades,
+        sum(buy_usd)::float8 as buy_usd, sum(sell_usd)::float8 as sell_usd,
+        sum(case when net_tok > 0 and net_usd > 0 then net_usd when net_usd < 0 then net_usd else 0 end)::float8 as net_usd,
+        max(last_at) as last_at
+      from flow group by token
+    ),
+    top as (
+      select a.*, t.symbol, t.name, t.image_url, t.launchpad, t.status,
+        t.market_cap_usd::float8 as market_cap_usd, t.price_usd::float8 as price_usd
+      from agg a
+      join tokens t on t.address = a.token
+      left join signals sg on sg.token = a.token
+      where a.buyers >= 1 and a.buyers + a.sellers >= ${window === '1h' ? 1 : 2}
+        ${scope === 'pons' ? sql`and t.launchpad = 'pons'` : sql``}
+        and t.created_at < now() - ${MIN_AGE}::interval
+        and coalesce(sg.risk_level, '') <> 'high'
+        and not coalesce((sg.data->>'copycat')::bool, false)
+        and not coalesce((sg.data->>'spam')::bool, false)
+      order by a.buyers - a.sellers desc, a.buyers desc, a.net_usd desc, a.token
+      limit ${n}
+    )
+    select top.token, top.symbol, top.name, top.image_url, top.launchpad, top.status, top.market_cap_usd, top.price_usd,
+      top.buyers, top.sellers, top.trades, top.buy_usd, top.sell_usd, top.net_usd,
+      round(100.0 * (top.buyers - top.sellers) / nullif(top.buyers + top.sellers, 0))::int as score,
+      case when p0.price_usd > 0 and top.price_usd is not null then round((100.0 * (top.price_usd / p0.price_usd - 1))::numeric, 1)::float8 end as change_pct,
+      extract(epoch from fs.first_at)::int as first_smart_at,
+      extract(epoch from top.last_at)::int as last_at
+    from top
+    left join lateral (
+      select s.price_usd::float8 as price_usd from swaps s
+      where s.token = top.token and s.time > now() - ${iv}::interval and s.price_usd > 0
+      order by s.time limit 1
+    ) p0 on true
+    left join lateral (
+      select min(s.time) as first_at from swaps s
+      where s.token = top.token and s.side = 'buy' and s.trader = any(${smart}::text[]) and s.time > '2000-01-01'
+    ) fs on true
+    order by top.buyers - top.sellers desc, top.buyers desc, top.net_usd desc, top.token`
+    : [];
+  return { window, scope, at: new Date().toISOString(), smart_wallets: smart.length, tokens: rows };
+}
